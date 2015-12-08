@@ -15,6 +15,8 @@ The provided schematic omitted these connections and the documentation for the m
 leaves much to be desired, leading one to suspect that the clock could be passed internally 
 via configuration.
 
+The system board currently consists of CPU, RAM, ROM, and a Xilinx XC95108 CPLD.
+
 Next steps:
 Proper RAM sizing/detection and testing.
 Increasing RAM data bus to 32bits.  ROM to remain 8bit due to simplicity of flashing devices.
