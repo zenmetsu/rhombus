@@ -80,7 +80,7 @@ ROMSTART	EQU	*		BEGINNING OF PROGRAM SECTION
 		LEA.L	MEMDAT,A1	POINT TO MEMORY EXERCISER DATA
 
 LOOP0		EQU	*
-		MOVE.L	#$1FFF,D0	INIT INNER LOOP COUNTER
+		MOVE.L	#$3FF,D0	INIT INNER LOOP COUNTER, INITIALLY CHECK 1K
 		MOVE.B	(A1,D3),D2	GET MEMORY DATA
 
 LOOP1		EQU	*
@@ -96,24 +96,24 @@ LOOP1_1		EQU	*
 *	When memory test completes, memory is initialized with NOPs and vector table initialized with address of generic handler.
 *	After initialization, D7 will contain the number of errors from the test section
 
-MEMINIT		EQU	*
+memInit		EQU	*
 		LEA.L	RAMBAS,A0	POINT AT BASE OF RAM AGAIN
 		MOVE.L	#$1FFE,D0	USE AS LOOP COUNTER FOR MEMINIT
 		MOVE.L	#$3FE,D2	POINT TO BOTTOM OF VECTOR TABLE
-		MOVE.W	#NOP,D1		FILL NON-VECTORY MEMORY WITH NOPs
+		MOVE.W	#NOP,D1		FILL NON-VECTOR MEMORY WITH NOPs
 
-LOOP2		EQU	*
+.loop2		EQU	*
 		MOVE.W	D1,(A0,D0)	PUT DATA INTO MEMORY
 		SUBQ	#2,D0		DECREMENT COUNTER
 		CMP.L	D0,D2		LOOK FOR BOTTOM OF VECTOR TABLE
-		BNE.S	LOOP2		LOOP UNTIL BOTTOM OF VECTOR TABLE
+		BNE.S	.loop2		LOOP UNTIL BOTTOM OF VECTOR TABLE
 		SUBQ	#2,D0		ELSE MOVE TO LONG-WORD INIT
 		MOVE.L	#EXCHND,D1	PUT GENERIC EXCEPTION HANDLER IN REST OF VECTOR TABLE
 
-LOOP3		EQU	*
+.loop3		EQU	*
 		MOVE.L	D1,(A0,D0)	PUT HANDLER ADDRESS THERE
 		SUBQ	#4,D0		AND DECREMENT POINTER
-		BGE.S	LOOP3		FILL REST OF MEMORY
+		BGE.S	.loop3		FILL REST OF MEMORY
 
 *	Memory check/initialization complete
 
@@ -123,13 +123,17 @@ LOOP3		EQU	*
 		TST	D7		NOW CHECK FOR MEMORY ERRORS
 		BEQ	NO_ERR		IF NONE, OUTPUT OK MESSAGE
 		LEA.L	ERRMSG,A0	POINT TO TOP OF MESSAGE
-		BRA.S	INITND		JUMP TO END OF INIT ROUTINE
+		BSR.W	printString	PRINT MESSAGE
+.memfail	NOP			DO NOTHING, QUICKLY
+		BRA.S	.memfail
 
 NO_ERR		EQU	*		INIT OK!
 		LEA.L	OKMSG,A0	POINT TO TOP OF MESSAGE
+		BSR.W	printString	Output messsage over serial port
+		BSR.W	RAMsizer	Check RAM Size
 
-INITND		EQU	*
-		BSR.S	printString	Output messsage over serial port		
+
+INITND		EQU	*		INIT END
 POLL		EQU	*		POLL SERIAL PORT FOR INPUT
 		BTST.B	#3,MFPRSR	CHECK FOR BREAK
 		BNE.S	BREAK		IF PRESENT, JUMP TO PROCESS
@@ -177,14 +181,101 @@ MFPEXC		EQU	*
 		RTE
 
 ****************************************
+* RAM sizer and diagnostic
+
+RAMsizer	EQU	*
+		LEA.L	msgRamSizing,A0
+		BSR.W   printString     Output messsage over serial port
+		MOVE.L	#$7FF,D1	Start at 2K mark to avoid disrupting existing 1K stack
+		MOVE.L  #$2,D3		D3 stores amount of RAM in KB
+		LEA.L	RAMBAS,A1	
+		MOVE.B	#$76,D2		First test pattern, 0x76
+.loopSiz	MOVE.B	D2,(A1,D1)	Write to RAM
+		CMP.B	(A1,D1),D2	Compare to see if write was successful
+		BNE.S	.reportRAM	If failure, report size of detected RAM
+		NOT.B	D2		Invert test pattern
+		MOVE.B	D2,(A1,D1)	Retest memory location
+		CMP.B	(A1,D1),D2	Compare to see if write was successful
+		BNE.S	.reportRAM	If failure, report size of detected RAM
+                ADDI.L	#$400,D1	Increment test point by 1KB
+		ADDI.W	#$1,D3		
+		BRA.S	.loopSiz	Loop until failure
+
+	
+.reportRAM	EQU	*
+		LEA.L	msgRamFound1,A0
+		BSR.S	printString
+		BSR.S	.printVal
+		LEA.L	msgRamFound2,A0
+		BSR.S	printString	
+		RTS			Exit RAMsizer
+
+.progress	EQU	*
+
+.printVal	EQU	*
+		EOR.L	D1,D1		Clear D1, will store character to be written
+		EOR.L	D2,D2		Clear D2, will be zero until first character written
+.loop10000	CMPI.W	#$2710,D3	Compare to 10000
+		BLT.S	.print10000	Branch if less than
+		SUBI.W	#$2710,D3	Subtract 10000
+		ADDI.B	#$1,D1		Increment digit to be written
+		BRA.S	.loop10000	Repeat until less than 10000	
+
+.print10000	BSR.S	.printChar
+		EOR.L	D1,D1		Clear D1, will store character to be written
+.loop1000	CMPI.W	#$3E8,D3	Compare to 1000
+		BLT.S	.print1000	Branch if less than
+		SUBI.W	#$3E8,D3	Subtract 1000
+		ADDI.B	#$1,D1		Increment digit to be written
+		BRA.S	.loop1000	Repeat until less than 1000
+
+.print1000	BSR.S	.printChar
+		EOR.L	D1,D1		Clear D1, will store character to be written
+.loop100	CMPI.W	#$64,D3		Compare to 100
+		BLT.S	.print100	Branch if less than
+		SUBI.W	#$64,D3		Subtract 100
+		ADDI.B	#$1,D1		Increment digit to be written
+		BRA.S	.loop100	Repeat until less than 100
+
+.print100	BSR.S   .printChar      
+                EOR.L   D1,D1           Clear D1, will store character to be written
+.loop10		CMPI.W	#$A,D3		Compare to 10
+		BLT.S	.print10	Branch if less than
+		SUBI.W	#$A,D3		Subtract 10
+		ADDI.B	#$1,D1		Increment digit to be written
+		BRA.S	.loop10		Repeate until less than 10
+
+.print10	BSR.S   .printChar
+                EOR.L   D1,D1           Clear D1, will store character to be written
+		BSR.S	.printChar	No need to loop on 1s digit
+
+		RTS			GTFO
+
+
+
+.printChar	TST.B	D1
+		BNE.S	.continue
+		TST.B	D2
+		BNE.S	.continue
+		RTS		
+
+.continue	ADDI.B	#'0',D1		Convert to ASCII
+.wait		BTST.B  #7,MFPTSR	Check for empty transmit buffer
+                BEQ.S   .wait		Loop until ready
+                MOVE.B  D1,MFPUDR	Put character into USART data register
+		MOVE.B	#$1,D2		Mark first character as written to avoid zero-padding
+
+.end            RTS                     ELSE RETURN WHEN COMPLETED
+
+****************************************
 * MFP Transmit/Receive
 
 printString	EQU	*
-.loop		MOVE.B	(a0)+,d0	Read character data
+.loop		MOVE.B	(A0)+,D0	Read character data
 		BEQ.S	.end		Check for null terminator
 		BSR.S	outChar		Write the character
 		BRA.S	.loop		Loop until null found
-.end		RTS
+		RTS
 
 outChar		EQU	*
 		BTST.B	#7,MFPTSR	Check for empty transmit buffer
@@ -197,14 +288,22 @@ outChar		EQU	*
 *	MESSAGES SECTION
 
 OKMSG		EQU	*
-		DC.B	'WELCOME TO RHOMBUS CONFIGURATION SYSTEM >',0
+		DC.B	'<RESET>',CR,LF
+		DC.B	'MC68901 Multifunction Peripheral Initialized',CR,LF,LF,0
 
 ERRMSG		EQU	*
+		DC.B	'<RESET>',CR,LF
 		DC.B	'MEMORY ERRORS ENCOUNTERED...',CR,LF,'>',0
 
 msgBanner	EQU	*
 		DC.B	'RHOMBUS 68020 System Monitor',CR,LF
 		DC.B	'============================',CR,LF,0
 
+msgRamSizing	EQU	*
+		DC.B	'RAM detection in progress...',CR,LF,0
 
+msgRamFound1	EQU	*
+		DC.B	CR,'Detected: ',0
+msgRamFound2	EQU	*
+		DC.B	'KB',0
 		END	START
