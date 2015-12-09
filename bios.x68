@@ -250,7 +250,7 @@ RAMsizer	EQU	*
 		BRA.S	.loop10		Repeate until less than 10
 
 .print10	BSR.S   .printChar
-                EOR.L   D1,D1           Clear D1, will store character to be written
+                MOVE.B   D3,D1           Clear D1, will store character to be written
 		BSR.S	.printChar	No need to loop on 1s digit
 
 		RTS			GTFO
