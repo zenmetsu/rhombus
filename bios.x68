@@ -134,6 +134,10 @@ NO_ERR		EQU	*		INIT OK!
 
 
 INITND		EQU	*		INIT END
+		LEA.L	msgBanner,A0	Print Banner
+		BSR.W	printString	
+		LEA.L	msgPrompt,A0	Print prompt
+		BSR.W	printString
 POLL		EQU	*		POLL SERIAL PORT FOR INPUT
 		BTST.B	#3,MFPRSR	CHECK FOR BREAK
 		BNE.S	BREAK		IF PRESENT, JUMP TO PROCESS
@@ -296,8 +300,12 @@ ERRMSG		EQU	*
 		DC.B	'MEMORY ERRORS ENCOUNTERED...',CR,LF,'>',0
 
 msgBanner	EQU	*
+		DC.B	'============================',CR,LF
 		DC.B	'RHOMBUS 68020 System Monitor',CR,LF
 		DC.B	'============================',CR,LF,0
+
+msgPrompt	EQU	*
+		DC.B	'>',0
 
 msgRamSizing	EQU	*
 		DC.B	'RAM detection in progress...',CR,LF,0
@@ -305,5 +313,5 @@ msgRamSizing	EQU	*
 msgRamFound1	EQU	*
 		DC.B	CR,'Detected: ',0
 msgRamFound2	EQU	*
-		DC.B	'KB',0
+		DC.B	'KB',CR,LF,LF,0
 		END	START
