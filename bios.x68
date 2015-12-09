@@ -207,6 +207,7 @@ RAMsizer	EQU	*
 
 	
 .reportRAM	EQU	*
+		SUBI.W	#$1,D3		Correct KB count due to failed test after increment
 		LEA.L	msgRamFound1,A0
 		BSR.S	printString
 		BSR.S	.printVal
