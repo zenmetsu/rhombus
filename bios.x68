@@ -554,7 +554,7 @@ dumpRAM		MOVEM.L	D2-D4/A2,-(SP)	Save registers
 		MOVE.L	A0,A2		Save start address
 		MOVE.L	D0,D2		Save number of bytes
 .line		MOVE.L	A2,D0
-		BSR.W	printHexAddr	Starting address of the lien
+		BSR.W	printHexLong	Starting address of the line
 		LEA	msgColonSpc,A0
 		BSR.W	printString
 		MOVE.L	#16,D3		16 bytes printed on a line
