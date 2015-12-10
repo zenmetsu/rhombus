@@ -588,6 +588,8 @@ dumpRAM		MOVEM.L	D2-D4/A2,-(SP)	Save registers
 		SUBQ.B	#1,D4
 		MOVE.B	(A2)+,D0	Read the byte
 		CMP.B	#' ',D0		Check if character is in printable range
+		BLT.S	.unprintable
+		CMP.B	#'~',D0		Highest printable character
 		BGT.S	.unprintable
 		BSR.W	outChar
 		BRA.S	.endbytesLoop
@@ -629,8 +631,7 @@ printHex_WrdEnt ROL.L   #8,D2		2143 -> 1432 Middle byte in low
 		ROL.L   #8,D2
 		MOVE.L  D2,D0
 		BSR.S   printHexByte	Print the low byte (0-7)
-    
-    		MOVE.L (SP)+,D2		Restore D2
+    		MOVE.L	(SP)+,D2	Restore D2
     		RTS		
 
 printHexByte	MOVE.L	D2,-(SP)
@@ -643,7 +644,7 @@ printHexByte	MOVE.L	D2,-(SP)
 .second		BSR.W	outChar
 		ANDI.B	#$0F,D2
 		ADD.B	#'0',D2
-		CMP.B	#'9',D0
+		CMP.B	#'9',D2
 		BLE.S	.end
 		ADD.B	#7,D2
 .end		MOVE.B	D2,D0
