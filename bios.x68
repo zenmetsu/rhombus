@@ -612,21 +612,18 @@ printHexWord	MOVE.L	D2,-(SP)	Save D2
 printHexAddr	MOVE.L	D2,-(SP)	Save D2
 		MOVE.L	D0,D2		Save address in D2
 		ROL.L	#8,D2		4321 -> 3214
-		BRA.S	printHex_WrdEnt	Print last 24 bits
+		BRA.S	printHex_AddEnt	Print last 24 bits
 
 printHexLong
 		MOVE.L  D2,-(SP)	Save D2
 		MOVE.L  D0,D2		Save the address in D2
-    
 		ROL.L   #8,D2		4321 -> 3214 high byte in low
 		MOVE.L  D2,D0
 		BSR.S   printHexByte	Print the high byte (24-31)
-printHex_AddEnt     
-		ROL.L   #8,D2		3214 -> 2143 middle-high byte in low
+printHex_AddEnt ROL.L   #8,D2		3214 -> 2143 middle-high byte in low
 		MOVE.L  D2,D0              
 		BSR.S   printHexByte	Print the high-middle byte (16-23)
-printHex_WrdEnt    
-		ROL.L   #8,D2		2143 -> 1432 Middle byte in low
+printHex_WrdEnt ROL.L   #8,D2		2143 -> 1432 Middle byte in low
 		MOVE.L  D2,D0
 		BSR.S   printHexByte	Print the middle byte (8-15)
 		ROL.L   #8,D2
@@ -646,6 +643,7 @@ printHexByte	MOVE.L	D2,-(SP)
 .second		BSR.W	outChar
 		ANDI.B	#$0F,D2
 		ADD.B	#'0',D2
+		CMP.B	#'9',D0
 		BLE.S	.end
 		ADD.B	#7,D2
 .end		MOVE.B	D2,D0
