@@ -7,10 +7,22 @@
 												*****
 ROMBAS		EQU	0		ROM BASE ADDRESS					*****
 RAMBAS		EQU	$F00000		RAM BASE ADDRESS					*****
-STACK		EQU	$F007FF		INITIAL STACK POINTER					*****
+STACK		EQU	varLast		INITIAL STACK POINTER $F007AA				*****
 MFPBAS		EQU	$EF0000		MFP BASE ADDRESS					*****
 MFPVCT		EQU	$40		VECTOR FOR MFP SOURCED INTERRUPT			*****
+												*****
+****************************************							*****
+*   Defines											*****
+												*****
 NOP		EQU	$4E71		STANDARD 68000 NOP INSTRUCTION				*****
+MAX_LINELEN	EQU	80									*****
+												*****
+****************************************							*****
+*   Variables											*****
+												*****
+varCurAddr	EQU	$F007FC									*****
+varLineBuf	EQU	varCurAddr-MAX_LINELEN-2						*****
+varLast		EQU	varLineBuf								*****
 												*****
 ****************************************							*****
 *   MC68901 MFP Registers									*****
@@ -45,6 +57,7 @@ MFPUDR		EQU     MFPBAS+$2F								*****
 												*****
 CTRLC		EQU	$03									*****
 BEL		EQU	$07									*****
+BKSP		EQU	$08		CTRL-H							*****
 TAB		EQU	$09									*****
 LF		EQU	$0A								     ***********
 CR		EQU	$0D								      *********
@@ -151,16 +164,16 @@ NO_ERR		EQU	*		INIT OK!						*****
 		BSR.W	printString								*****  **********************
 PROMPT		LEA.L	msgPrompt,A0	Print prompt						*****************************
 		BSR.W	printString								*****  **********************
-POLL		EQU	*		POLL SERIAL PORT FOR INPUT				*****    ****		*****
-		BTST.B	#3,MFPRSR	CHECK FOR BREAK						*****      **		*****
-		BNE.S	BREAK		IF PRESENT, JUMP TO PROCESS				*****			*****
-		BTST.B	#7,MFPRSR	ELSE CHECK FOR CHARACTER				*****			*****
-		BEQ.S	POLL		LOOP IF NO DATA PRESENT, ELSE DATA PRESENT IN USART RX	*****			*****
-*					ADD USER INPUT PROCESSING ROUTINE HERE			*****			*****
+		BSR.W	readLine	Get User Input						*****    ****		*****
+		BSR.W	convertCase	Convert to upper-case					*****      **		*****
+		BSR.W	parseLine	Then parse user input					*****			*****
 												*****			*****
-BREAK		EQU	*		BREAK DETECT ROUTINE					*****************************
-*					ADD USER BREAK HANDLER HERE				*****************************
-		JMP	POLL		AND RETURN WHEN COMPLETED				*****************************
+		BRA.S	PROMPT									*****			*****
+												*****			*****
+												*****			*****
+												*****************************
+												*****************************
+												*****************************
 
 
 *****************************************************************************************************
@@ -315,14 +328,14 @@ RAMsizer	EQU	*									*****
 												*************************
 printString	EQU	*									*****
 .loop		MOVE.B	(A0)+,D0	Read character data					*****	
-		BEQ.S	.end		Check for null terminator				*****		**
-		BSR.S	.outChar	Write the character					*****		****
+		BEQ.S	.printEnd	Check for null terminator				*****		**
+		BSR.S	outChar		Write the character					*****		****
 		BRA.S	.loop		Loop until null found					**********************
-		RTS										************************
+.printEnd	RTS										************************
 												**********************
-.outChar	EQU	*									*****		****
+outChar		EQU	*									*****		****
 		BTST.B	#7,MFPTSR	Check for empty transmit buffer				*****		**
-		BEQ.S	.outChar	Loop until ready					*****
+		BEQ.S	outChar		Loop until ready					*****
 		MOVE.B	D0,MFPUDR	Put character into USART data register			*****
 		RTS			ELSE RETURN WHEN COMPLETED				*****
 										*********************
@@ -330,33 +343,134 @@ printString	EQU	*									*****
 										*********************
 
 
+inChar		EQU	*									*****
+		BTST.B	#7,MFPRSR	Check for empty receive buffer				*****
+		BEQ.S	inChar		Loop until ready					*****
+		MOVE.B	MFPUDR,D0								*****
+		RTS										*****
+
+		
+readLine	MOVEM.L	D2/A2,-(SP)	Preserve registers which will be modified		************************
+		LEA	varLineBuf,A2	Point to start of lineBuffer				************************
+		EOR.W	D2,D2		Clear the character counter				************************
+.loop		BSR.S	inChar		Read a character from the UART buffer			*****
+		CMP.B	#BKSP,D0	Is user having difficulty typing?			*****
+		BEQ.S	.backspace								*****
+		CMP.B	#CTRLX,D0	Is user having second thoughts?				*****
+		BEQ.S	.lineclear								*****
+		CMP.B	#CR,D0		Did the user finally make up their mind?		*****
+		BEQ.S	.endline								*****
+		CMP.B	#LF,D0		We don't care about LFs... everything else continues	*****
+		BEQ.S	.loop		and doesn't make this loop back				*****
+.char		CMP.W	#MAX_LINELEN,D2	If the line is too long...				*****
+		BGE.S	.loop		...we're going to stop listening to the user		*****
+		MOVE.B	D0,(A2)+	Otherwise, store character				*****
+		ADDQ.W	#1,D2		...and increment character count			*****
+		BSR.S	outChar		Local echo						*****
+		BRA.S	.loop		Get next character					*****
+.backspace	TST.W	D2		Are we at beginning of the line?			*****
+		BEQ.S	.loop		If so, user has doublefailed and we'll ignore BKSP	*****
+*					but seriously, we should send a BEL just for insult	*****
+		BSR.S	outChar		Remove the previous character from the user's console	*****
+		MOVE.B	#' ',D0		via a complex and convoluted process of writing a space	*****
+		BSR.S	outChar		after going back a space...				*****
+		MOVE.B	#BKSP,D0	...and going back a space again				*****
+		BSR.S	outChar		just to keep things tidy.				*****
+		SUBQ.L	#1,A2		Move back in buffer one space				*****
+		SUBQ.L	#1,D2		And reduce character count by one			*****
+		BRA.S	.loop		Get next character					*****
+.lineclear	TST	D2		Is there even data to clear?				*****
+		BEQ.S	.loop		If not, just ignore and fetch next character		*****
+		SUBA.L	D2,A2		Return to start of the buffer				*****
+.lineclearloop	MOVE.B	#BKSP,D0								*****
+		BSR.S	outChar		Backspace...						*****
+		MOVE.B	#' ',D0									*****
+		BSR.W	outChar		Spaaaaaaaaaaaaace....					*****
+		MOVE.B	#BKSP,D0								*****
+		BSR.W	outChar		Backspace...						*****
+		SUBQ.W	#1,D2		Decrement character count				*****
+		BNE.S	.lineclearloop	Repeat until start of line				*****
+		BRA.S	.loop									*****
+.endline	BSR.W	outChar		Echo the character					*****
+		MOVE.B	#LF,D0									*****
+		BSR.W	outChar		Throwing in a free LF for good measure			*****
+		MOVE.B	#0,(A2)		Add null terminator...					*****		**
+		MOVEA.L	A2,A0		Ready the pointer to get to the choppah			*****		****
+		MOVEM.L	(SP)+,D2/A2	Restore registers				******************************
+		RTS									********************************
+											******************************
+														****
+														**
+
+
+convertCase	LEA	varLineBuf,A0	Get start of line					************************
+.loop		MOVE.B	(A0),D0									************************
+		CMP.B	#'a',D0		Check if less than 'a'					************************
+		BLT.S	.next									*****
+		CMP.B	#'z',D0		Check if greater than 'z'				*****
+		BGT.S	.next									*****
+		SUB.B	#$20,D0		Convert to upper-case					*****		**
+.next		MOVE.B	D0,(A0)+	Store the character back in A0, move to next		*****		****
+		BNE.S	.loop		Loop until null terminator			******************************
+		RTS									********************************
+											******************************
+														****
+														**
+
+
+parseLine	MOVEM.L	A2-A3,-(SP)	Save registers						************************
+		LEA varLineBuf,A0	Get start of line					************************
+.findCommand	MOVE.B	(A0)+,D0								************************
+		CMP.B	#' ',D0		Ignore spaces						*****
+		BEQ.W	.findCommand								*****
+		CMP.B	#'E',D0		EXAMINE							*****
+		BEQ.W	.examine								*****
+		CMP.B	#'D',D0		DEPOSIT							*****
+		BEQ.W	.deposit								*****
+		CMP.B	#'R',D0		RUN							*****
+		BEQ.W	.run									*****
+		CMP.B	#'H',D0		HELP							*****
+		BEQ.W	.help									*****
+		CMP.B	#0,D0		BLANK LINE						*****
+		BEQ.S	.exit									*****
+.invalid	LEA	msgNoCMD,A0								*****		**
+		BSR.W	printString								*****		****			
+.exit		MOVEM.L	(SP)+,A2-A3	Restore registers					**********************		
+		RTS										************************
+												**********************
+												*****		****
+.examine	BRA.S	.exit									*****		**
+.deposit	BRA.S	.exit									*****
+.run		BRA.S	.exit									*****
+.help		BRA.S	.exit									*****
+											*************
+											*************
+											*************
+
 *****************************************************************************************************
 *****************************************************************************************************
 * MESSAGES SECTION										*****
 												*****
 												*****
-OKMSG		EQU	*									*****
-		DC.B	'<RESET>',CR,LF								*****
+OKMSG		DC.B	'<RESET>',CR,LF								*****
 		DC.B	'MC68901 Multifunction Peripheral Initialized',CR,LF,LF,0		*****
 												*****
-ERRMSG		EQU	*									*****
-		DC.B	'<RESET>',CR,LF								*****
+ERRMSG		DC.B	'<RESET>',CR,LF								*****
 		DC.B	'MEMORY ERRORS ENCOUNTERED...',CR,LF,'>',0				*****
 												*****
-msgBanner	EQU	*									*****
-		DC.B	'============================',CR,LF					*****
+msgBanner	DC.B	'============================',CR,LF					*****
 		DC.B	'RHOMBUS 68020 System Monitor',CR,LF					*****
 		DC.B	'============================',CR,LF,0					*****
 												*****
-msgPrompt	EQU	*									*****
-		DC.B	'>',0									*****
+msgPrompt	DC.B	'>',0									*****
 												*****
-msgRamSizing	EQU	*									*****
-		DC.B	'RAM detection in progress...',CR,LF,0					*****
+msgRamSizing	DC.B	'RAM detection in progress...',CR,LF,0					*****
 												*****
-msgRamFound1	EQU	*									*****
-		DC.B	CR,'Detected: ',0							*****
-msgRamFound2	EQU	*									*****
-		DC.B	'KB',CR,LF,LF,0								*****
-		END	START									*****
+msgRamFound1	DC.B	CR,'Detected: ',0							*****
+msgRamFound2	DC.B	'KB',CR,LF,LF,0								*****
+												*****
+msgNoCMD	DC.B	'Invalid Command',CR,LF,0
+
+
+		END	START	
 
