@@ -7,7 +7,7 @@
 												*****
 ROMBAS		EQU	0		ROM BASE ADDRESS					*****
 RAMBAS		EQU	$F00000		RAM BASE ADDRESS					*****
-STACK		EQU	$F003FF		INITIAL STACK POINTER					*****
+STACK		EQU	$F007FF		INITIAL STACK POINTER					*****
 MFPBAS		EQU	$EF0000		MFP BASE ADDRESS					*****
 MFPVCT		EQU	$40		VECTOR FOR MFP SOURCED INTERRUPT			*****
 NOP		EQU	$4E71		STANDARD 68000 NOP INSTRUCTION				*****
@@ -92,7 +92,7 @@ ROMSTART	EQU	*		BEGINNING OF PROGRAM SECTION				*****
 		LEA.L	MEMDAT,A1	POINT TO MEMORY EXERCISER DATA				*****
 												*****
 LOOP0		EQU	*									*****
-		MOVE.L	#$3FF,D0	INIT INNER LOOP COUNTER, INITIALLY CHECK 1K		*****
+		MOVE.L	#$7FF,D0	INIT INNER LOOP COUNTER, INITIALLY CHECK 2K		*****
 		MOVE.B	(A1,D3),D2	GET MEMORY DATA						*****
 												*****
 LOOP1		EQU	*									*****
@@ -111,7 +111,7 @@ LOOP1_1		EQU	*									*****
 												*****
 memInit		EQU	*									*****
 		LEA.L	RAMBAS,A0	POINT AT BASE OF RAM AGAIN				*****
-		MOVE.L	#$1FFE,D0	USE AS LOOP COUNTER FOR MEMINIT				*****
+		MOVE.L	#$7FE,D0	USE AS LOOP COUNTER FOR MEMINIT				*****
 		MOVE.L	#$3FE,D2	POINT TO BOTTOM OF VECTOR TABLE				*****
 		MOVE.W	#NOP,D1		FILL NON-VECTOR MEMORY WITH NOPs			*****
 												*****
@@ -193,9 +193,9 @@ MFPINIT		EQU	*		MC68901 INITIALIZATION ROUTINE				*****
 		CLR.L	D0		CLEAR D0						*****
 		SUBQ	#1,D0		THEN TURN INTO ALL 1's					*****
 		MOVE.B	D0,MFPDDR	ALL MFP I/O INITIALIZED TO OUTPUT			*****
-		ADDQ	#3,D0		NOW TURN D0 INTO 2					*****
-		MOVE.B	D0,MFPTCDR	SELECT 1/4 TX CLOCK					*****
-		MOVE.B	D0,MFPTDDR	SEELCT 1/4 RX CLOCK					*****
+		ADDQ	#2,D0		NOW TURN D0 INTO 1					*****
+		MOVE.B	D0,MFPTCDR	SELECT 1/2 TX CLOCK					*****
+		MOVE.B	D0,MFPTDDR	SEELCT 1/2 RX CLOCK					*****
 		MOVE.B	#$11,MFPTCDCR	SELECT DIVIDE BY 4 IN C/D CONTROL REGISTER		*****
 		MOVE.B	#$88,MFPUCR	SELECT DIVIDE BY 16, 8-BIT				*****
 *					NO PARITY IN USART CONTROL REGISTER			*****
@@ -228,8 +228,8 @@ MFPINIT		EQU	*		MC68901 INITIALIZATION ROUTINE				*****
 RAMsizer	EQU	*									*****
 		LEA.L	msgRamSizing,A0								*****
 		BSR.W   printString     Output messsage over serial port			*****
-		MOVE.L	#$7FF,D1	Start at 2K mark to avoid disrupting existing 1K stack	*****
-		MOVE.L  #$2,D3		D3 stores amount of RAM in KB				*****
+		MOVE.L	#$BFF,D1	Start at 3K mark to avoid disrupting existing 2K stack	*****
+		MOVE.L  #$3,D3		D3 stores amount of RAM in KB				*****
 		LEA.L	RAMBAS,A1								*****
 		MOVE.B	#$76,D2		First test pattern, 0x76				*****
 .loopSiz	MOVE.B	D2,(A1,D1)	Write to RAM						*****
