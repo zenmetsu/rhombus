@@ -1,5 +1,36 @@
 *****************************************************************************************************
 *****************************************************************************************************
+*****	Title		: RHOMBUS System Monitor						*****
+*****	Written by	: Jason Westervelt							*****
+*****	Date		: 10 December 2015							*****
+*****	Description	: A ROM monitor for the RHOMBUS minimalist 68020 system			*****
+*****			  which was designed around the Motorola Application Note 1015		*****
+*****												*****	
+*****			  Portions of code borrowed from Hayden Kroepfl (ChartreuseK)		*****
+*****												*****	
+*****************************************************************************************************
+*****************************************************************************************************
+
+						*
+					       ***
+					      *****
+					     *******	
+					    **** ****
+					   ****   ****
+					  ****     ****
+					 ****       ****
+					****         ****
+					 ****       ****
+					  ****     ****
+					   ****   ****
+					    **** ****
+					     *******
+					      *****
+					       ***
+					        *
+
+*****************************************************************************************************
+*****************************************************************************************************
 * Equates section										*****
 												*****
 ****************************************							*****
@@ -27,30 +58,30 @@ varLast		EQU	varLineBuf								*****
 ****************************************							*****
 *   MC68901 MFP Registers									*****
 												*****
-MFPGPIP		EQU	MFPBAS+$1	GPIP DATA						*****
-MFPAER		EQU	MFPBAS+$3	ACTIVE EDGE						*****
-MFPDDR		EQU     MFPBAS+$5								*****
-MFPIERA		EQU     MFPBAS+$7								*****
-MFPIERB 	EQU     MFPBAS+$9								*****
-MFPIPRA		EQU     MFPBAS+$B								*****
-MFPIPRB		EQU     MFPBAS+$D								*****
-MFPISRA		EQU     MFPBAS+$F								*****
-MFPISRB		EQU     MFPBAS+$11								*****
-MFPIMRA		EQU     MFPBAS+$13								*****
-MFPIMRB		EQU     MFPBAS+$15								*****
-MFPVR		EQU     MFPBAS+$17								*****
-MFPTACR		EQU     MFPBAS+$19								*****
-MFPTBCR		EQU     MFPBAS+$1B								*****
-MFPTCDCR	EQU     MFPBAS+$1D								*****
-MFPTADR		EQU     MFPBAS+$1F								*****
-MFPTBDR		EQU     MFPBAS+$21								*****
-MFPTCDR		EQU     MFPBAS+$23								*****
-MFPTDDR		EQU     MFPBAS+$25								*****
-MFPSCR		EQU     MFPBAS+$27								*****
-MFPUCR		EQU     MFPBAS+$29								*****
-MFPRSR		EQU     MFPBAS+$2B								*****
-MFPTSR		EQU     MFPBAS+$2D								*****
-MFPUDR		EQU     MFPBAS+$2F								*****
+MFPGPDR		EQU	MFPBAS+$1	GPIO DATA REGISTER					*****
+MFPAER		EQU	MFPBAS+$3	ACTIVE EDGE REGISTER					*****
+MFPDDR		EQU     MFPBAS+$5	DATA DIRECTION REGISTER					*****
+MFPIERA		EQU     MFPBAS+$7	INTERRUPT ENABLE REGISTER A				*****
+MFPIERB 	EQU     MFPBAS+$9	INTERRUPT ENABLE REGISTER B				*****
+MFPIPRA		EQU     MFPBAS+$B	INTERRUPT PENDING REGISTER A				*****
+MFPIPRB		EQU     MFPBAS+$D	INTERRUPT PENDING REGISTER B				*****
+MFPISRA		EQU     MFPBAS+$F	INTERRUPT IN SERVICE REGISTER A				*****
+MFPISRB		EQU     MFPBAS+$11	INTERRUPT IN SERVICE REGISTER B				*****
+MFPIMRA		EQU     MFPBAS+$13	INTERRUPT MASK REGISTER A				*****
+MFPIMRB		EQU     MFPBAS+$15	INTERRUPT MASK REGISTER B				*****
+MFPVR		EQU     MFPBAS+$17	VECTOR REGISTER						*****
+MFPTACR		EQU     MFPBAS+$19	TIMER A CONTROL REGISTER				*****
+MFPTBCR		EQU     MFPBAS+$1B	TIMER B CONTROL REGISTER				*****
+MFPTCDCR	EQU     MFPBAS+$1D	TIMER C/D CONTROL REGISTER				*****
+MFPTADR		EQU     MFPBAS+$1F	TIMER A DATA REGISTER					*****
+MFPTBDR		EQU     MFPBAS+$21	TIMER B DATA REGISTER					*****
+MFPTCDR		EQU     MFPBAS+$23	TIMER C DATA REGISTER					*****
+MFPTDDR		EQU     MFPBAS+$25	TIMER D DATA REGISTER					*****
+MFPSCR		EQU     MFPBAS+$27	SYNCHRONOUS CHARACTER REGISTER				*****
+MFPUCR		EQU     MFPBAS+$29	USART CONTROL REGISTER					*****
+MFPRSR		EQU     MFPBAS+$2B	RECEIVER STATUS REGISTER				*****
+MFPTSR		EQU     MFPBAS+$2D	TRANSMITTER STATUS REGISTER				*****
+MFPUDR		EQU     MFPBAS+$2F	USART DATA REGISTER					*****
 												*****	
 ****************************************							*****
 *   ASCII Equates										*****
@@ -224,7 +255,7 @@ MFPINIT		EQU	*		MC68901 INITIALIZATION ROUTINE				*****
 *		START TX/RX CLOCKS								*****
 		MOVE.B	#1,MFPRSR	START RECEIVER CLOCK					*****
 		MOVE.B	#5,MFPTSR	START TRANSMIT CLOCK				     ***********
-		BSET.B	#7,MFPGPIP	RAISE RTS					      *********
+		BSET.B	#7,MFPGPDR	RAISE RTS					      *********
 											       *******
 		RTS			DONE!  RETURN FROM ROUTINE				*****	
 												 ***
@@ -447,211 +478,225 @@ parseLine	MOVEM.L	A2-A3,-(SP)	Save registers						************************
 *		e ADDR+LEN		Displays LEN bytes following ADDR			*****
 *		e ADDR;			Interactive mode: SPACE shows 16 lines, ENTER shows 1	*****
 												*****
-.examine	BSR.W	parseNumber	Read start address					
-		TST.B	D1		Non-zero return on invalid address
-		BNE.W	.invalidAddr
-		MOVE.L	D0,A3		Save the start address
-.exloop		MOVE.B	(A0)+,D0	
-		CMP.B	#' ',D0		Ignore spaces
+.examine	BSR.W	parseNumber	Read start address					*****	
+		TST.B	D1		Non-zero return on invalid address			*****
+		BNE.W	.invalidAddr								*****
+		MOVE.L	D0,A3		Save the start address					*****
+.exloop		MOVE.B	(A0)+,D0								*****
+		CMP.B	#' ',D0		Ignore spaces						*****
 		BEQ.S	.exloop									*****
-		CMP.B	#'-',D0		Check if range specified
-		BEQ.S	.exrange
-		CMP.B	#'+',D0		Check if lenth specified
-		BEQ.S	.exlength
-		CMP.B	#';',D0		Check if interactive requested
-		BEQ.S	.exinter
-		CMP.B	#'.',D0		Check if quick 16 is requested
+		CMP.B	#'-',D0		Check if range specified				*****
+		BEQ.S	.exrange								*****
+		CMP.B	#'+',D0		Check if lenth specified				*****
+		BEQ.S	.exlength								*****
+		CMP.B	#';',D0		Check if interactive requested				*****
+		BEQ.S	.exinter								*****
+		CMP.B	#'.',D0		Check if quick 16 is requested				*****
 		BEQ.S	.exquick								*****
-		MOVE.L	#1,D0		Otherwise read a single byte
-		BRA.S	.exend
-.exrange	BSR.W	parseNumber	Find the ending address
-		TST.B	D1		Non-zero return on invalid address
+		MOVE.L	#1,D0		Otherwise read a single byte				*****
+		BRA.S	.exend									*****
+.exrange	BSR.W	parseNumber	Find the ending address					*****
+		TST.B	D1		Non-zero return on invalid address			*****
 		BNE.W	.invalidAddr								*****
 		SUB.L	A3,D0		Get the length						*****
 		BRA.S	.exend									*****
 .exquick	MOVE.L	#$10,D0									*****
 		BRA.S	.exend									*****
-.exlength	BSR.W	parseNumber	Find the length
-		TST.B	D1		Non-zero return on invalid address
-		BNE.W	.invalidAddr
-.exend		MOVE.L	A3,A0		Parameter parsing complete, pass to dumpRAM and return
-		BSR.W	dumpRAM
-		BRA.S	.exit
-.exinter	MOVE.L	A3,A0		Interactive mode, set current address
-		MOVE.L	#$10,D0		16 bytes
-		BSR.W	dumpRAM
-		ADD.L	#$10,A3		Move current address up 16 bytes
-.exinterend	BSR.W	inChar
-		CMP.B	#CR,D0		Display another line
-		BEQ.S	.exinter
-		CMP.B	#' ',D0		Display a page (256 bytes)
-		BEQ.S	.exinterpage
-		BRA.S	.exit		Else exit
+.exlength	BSR.W	parseNumber	Find the length						*****
+		TST.B	D1		Non-zero return on invalid address			*****
+		BNE.W	.invalidAddr								*****
+.exend		MOVE.L	A3,A0		Parameter parsing complete, pass to dumpRAM and return	*****
+		BSR.W	dumpRAM									*****
+		BRA.S	.exit									*****
+.exinter	MOVE.L	A3,A0		Interactive mode, set current address			*****
+		MOVE.L	#$10,D0		16 bytes						*****
+		BSR.W	dumpRAM									*****
+		ADD.L	#$10,A3		Move current address up 16 bytes			*****
+.exinterend	BSR.W	inChar									*****
+		CMP.B	#CR,D0		Display another line					*****
+		BEQ.S	.exinter								*****
+		CMP.B	#' ',D0		Display a page (256 bytes)				*****
+		BEQ.S	.exinterpage								*****
+		BRA.S	.exit		Else exit						*****
 .exinterpage	MOVE.L	A3,A0									*****
-		MOVE.L	#$100,D0	256 bytes
-		BSR.W	dumpRAM		Dump 16 lines
-		ADD.L	#$100,A3	Adjust current address to match
-		BRA.S	.exinterend
-												*****
+		MOVE.L	#$100,D0	256 bytes						*****
+		BSR.W	dumpRAM		Dump 16 lines						*****
+		ADD.L	#$100,A3	Adjust current address to match				*****
+		BRA.S	.exinterend								*****
+										*********************
+										*********************
+										*********************
+
 .deposit	BRA.W	.exit									*****
-
+												
 .run		BRA.W	.exit									*****
-
-.help		LEA	msgHelp,A0
-		BSR.W	printString
-		BRA.W	.exit
+												
+.help		LEA	msgHelp,A0								*****
+		BSR.W	printString								*****
+		BRA.W	.exit									*****
 
 .invalidAddr	LEA	msgBadAddr,A0								*****
 		BSR.W	printString								*****
 		BRA.W	.exit									*****
-												*****
+
 .invalidVal	LEA	msgBadVal,A0								*****
 		BSR.W	printString								*****
 		BRA.W	.exit									*****
-											*************
-											*************
-											*************
-
-parseNumber	EOR.L	D0,D0		Clear D0
-		MOVE.B	(A0)+,D0
-		CMP.B	#' ',D0		Ignore leading spaces
-		BEQ.S	parseNumber
-		CMP.B	#'0',D0		Look for hex digits 0-9
-		BLT.S	.invalid
-		CMP.B	#'9',D0
-		BLE.S	.firstdigit1
-		CMP.B	#'A',D0		Look for hex digits A-F
-		BLT.S	.invalid
-		CMP.B	#'F',D0
-		BLE.S	.firstdigit2
-.invalid	MOVE.L	#1,D1
-		RTS
-.firstdigit2	SUB.B	#'7',D0		Convert 'A' to 10, and so on
-		BRA.S	.loop
-.firstdigit1	SUB.B	#'0',d0		Convert '0' to 0, and so on
-.loop		MOVE.B	(A0)+,D1	Read in a digit
-		CMP.B	#'0',D1		Look for hex digits 0-9
-		BLT.S	.end		End loop on anything else
-		CMP.B	#'9',D1
-		BLE.S	.digit1
-		CMP.B	#'A',D1		Look for hex digits A-F
-		BLT.S	.end
-		CMP.B	#'F',D1
-		BLE.S	.digit2
-.end		SUBQ.L	#1,A0		Non-hex digit encountered, end parsing
-		MOVE.L	#0,D1		Move pointer back and clear D1
-		RTS
-.digit2		SUB.B	#'7',D1		Convert 'A' to 10, and so on
-		BRA.S	.digit3
-.digit1		SUB.B	#'0',D1		Convert '0' to 0, and so on
-.digit3		LSL.L	#4,D0		Shift to the next nybble
-		ADD.B	D1,D0		Place in our current nybble
-		BRA.S	.loop
-
-
-
-dumpRAM		MOVEM.L	D2-D4/A2,-(SP)	Save registers
-		MOVE.L	A0,A2		Save start address
-		MOVE.L	D0,D2		Save number of bytes
-.line		MOVE.L	A2,D0
-		BSR.W	printHexLong	Starting address of the line
-		LEA	msgColonSpc,A0
-		BSR.W	printString
-		MOVE.L	#16,D3		16 bytes printed on a line
-		MOVE.L	D3,D4		Save number of bytes on this line
-.hexbyte	TST.L	D2		Check if out of bytes
-		BEQ.S	.endbytesShort
-		TST.B	D3		Check if line is finished
-		BEQ.S	.endbytes
-		MOVE.B	(A2)+,D0	Read in a byte from RAM
-		BSR.W	printHexByte	Display it
-		MOVE.B	#' ',D0		
-		BSR.W	outChar		Separate bytes for readability
-		SUBQ.L	#1,D3
-		SUBQ.L	#1,D2
-		BRA.S	.hexbyte
-.endbytesShort	SUB.B	D3,D4		Set D4 to actual number of bytes on this line
-		MOVE.B	#' ',D0
-.endbytesShrtLp	TST.B	D3		Check if line ended
-		BEQ.S	.endbytes
-		MOVE.B	#' ',D0
-		BSR.W	outChar		Pad end with spaces
-		MOVE.B 	#' ',D0
-		BSR.W	outChar		Pad end with spaces
-		MOVE.B 	#' ',D0
-		BSR.W	outChar		Pad end with spaces
-		SUBQ.B	#1,D3
-		BRA.S	.endbytesShrtLp
-.endbytes	SUBA.L	D4,A2		Return to the start address of this line
-.endbytesLoop	TST.B	D4		Check if done printing ASCII
-		BEQ	.endline
-		SUBQ.B	#1,D4
-		MOVE.B	(A2)+,D0	Read the byte
-		CMP.B	#' ',D0		Check if character is in printable range
-		BLT.S	.unprintable
-		CMP.B	#'~',D0		Highest printable character
-		BGT.S	.unprintable
-		BSR.W	outChar
-		BRA.S	.endbytesLoop
-.unprintable	MOVE.B	#'.',D0
-		BSR.W	outChar
-		BRA.S	.endbytesLoop
-.endline	LEA	msgNewline,A0
-		BSR.W	printString
-		TST.L	D2
-		BLE.S	.end
-		BRA.W	.line
-.end		MOVEM.L	(SP)+,D2-D4/A2	Restore registers
-		RTS
+															*
+parseNumber	EOR.L	D0,D0		Clear D0						************************
+		MOVE.B	(A0)+,D0								************************
+		CMP.B	#' ',D0		Ignore leading spaces					************************
+		BEQ.S	parseNumber								*****
+		CMP.B	#'0',D0		Look for hex digits 0-9					*****
+		BLT.S	.invalid								*****
+		CMP.B	#'9',D0									*****
+		BLE.S	.firstdigit1								*****
+		CMP.B	#'A',D0		Look for hex digits A-F					*****
+		BLT.S	.invalid								*****
+		CMP.B	#'F',D0									*****
+		BLE.S	.firstdigit2								*****
+.invalid	MOVE.L	#1,D1									*****
+		RTS										*****
+.firstdigit2	SUB.B	#'7',D0		Convert 'A' to 10, and so on				*****
+		BRA.S	.loop									*****
+.firstdigit1	SUB.B	#'0',d0		Convert '0' to 0, and so on				*****
+.loop		MOVE.B	(A0)+,D1	Read in a digit						*****
+		CMP.B	#'0',D1		Look for hex digits 0-9					*****
+		BLT.S	.end		End loop on anything else				*****
+		CMP.B	#'9',D1									*****
+		BLE.S	.digit1									*****
+		CMP.B	#'A',D1		Look for hex digits A-F					*****
+		BLT.S	.end									*****
+		CMP.B	#'F',D1									*****
+		BLE.S	.digit2									*****		**
+.end		SUBQ.L	#1,A0		Non-hex digit encountered, end parsing			*****		****
+		MOVE.L	#0,D1		Move pointer back and clear D1				**********************
+		RTS										************************
+.digit2		SUB.B	#'7',D1		Convert 'A' to 10, and so on				**********************
+		BRA.S	.digit3									*****		****
+.digit1		SUB.B	#'0',D1		Convert '0' to 0, and so on				*****		**
+.digit3		LSL.L	#4,D0		Shift to the next nybble				*****
+		ADD.B	D1,D0		Place in our current nybble				*****
+		BRA.S	.loop									*****
+										*********************
+										*********************
+										*********************
 
 
-printHexWord	MOVE.L	D2,-(SP)	Save D2
-		MOVE.L	D0,D2		Save address in D2
-		ROL.L	#8,D2		4321 -> 3214
-		ROL.L	#8,D2		3214 -> 2143
-		BRA.S	printHex_WrdEnt	Print last 16 bits
+dumpRAM		MOVEM.L	D2-D4/A2,-(SP)	Save registers						************************
+		MOVE.L	A0,A2		Save start address					************************
+		MOVE.L	D0,D2		Save number of bytes					************************
+.line		MOVE.L	A2,D0									*****
+		BSR.W	printHexLong	Starting address of the line				*****
+		LEA	msgColonSpc,A0								*****
+		BSR.W	printString								*****
+		MOVE.L	#16,D3		16 bytes printed on a line				*****
+		MOVE.L	D3,D4		Save number of bytes on this line			*****
+.hexbyte	TST.L	D2		Check if out of bytes					*****
+		BEQ.S	.endbytesShort								*****
+		TST.B	D3		Check if line is finished				*****
+		BEQ.S	.endbytes								*****
+		MOVE.B	(A2)+,D0	Read in a byte from RAM					*****
+		BSR.W	printHexByte	Display it						*****
+		MOVE.B	#' ',D0									*****
+		BSR.W	outChar		Separate bytes for readability				*****
+		SUBQ.L	#1,D3									*****
+		SUBQ.L	#1,D2									*****
+		BRA.S	.hexbyte								*****
+.endbytesShort	SUB.B	D3,D4		Set D4 to actual number of bytes on this line		*****
+		MOVE.B	#' ',D0									*****
+.endbytesShrtLp	TST.B	D3		Check if line ended					*****
+		BEQ.S	.endbytes								*****
+		MOVE.B	#' ',D0									*****
+		BSR.W	outChar		Pad end with spaces					*****
+		MOVE.B 	#' ',D0									*****
+		BSR.W	outChar		Pad end with spaces					*****
+		MOVE.B 	#' ',D0									*****
+		BSR.W	outChar		Pad end with spaces					*****
+		SUBQ.B	#1,D3									*****
+		BRA.S	.endbytesShrtLp								*****
+.endbytes	SUBA.L	D4,A2		Return to the start address of this line		*****
+.endbytesLoop	TST.B	D4		Check if done printing ASCII				*****
+		BEQ	.endline								*****
+		SUBQ.B	#1,D4									*****
+		MOVE.B	(A2)+,D0	Read the byte						*****
+		CMP.B	#' ',D0		Check if character is in printable range		*****
+		BLT.S	.unprintable								*****
+		CMP.B	#'~',D0		Highest printable character				*****
+		BGT.S	.unprintable								*****
+		BSR.W	outChar									*****
+		BRA.S	.endbytesLoop								*****
+.unprintable	MOVE.B	#'.',D0									*****
+		BSR.W	outChar									*****
+		BRA.S	.endbytesLoop								*****
+.endline	LEA	msgNewline,A0								*****
+		BSR.W	printString								*****
+		TST.L	D2									*****
+		BLE.S	.end									*****		**
+		BRA.W	.line									*****		****
+.end		MOVEM.L	(SP)+,D2-D4/A2	Restore registers					**********************		
+		RTS										************************	
+										**************************************
+										*********************		****
+										*********************		**
 
-printHexAddr	MOVE.L	D2,-(SP)	Save D2
-		MOVE.L	D0,D2		Save address in D2
-		ROL.L	#8,D2		4321 -> 3214
-		BRA.S	printHex_AddEnt	Print last 24 bits
 
-printHexLong
-		MOVE.L  D2,-(SP)	Save D2
-		MOVE.L  D0,D2		Save the address in D2
-		ROL.L   #8,D2		4321 -> 3214 high byte in low
-		MOVE.L  D2,D0
-		BSR.S   printHexByte	Print the high byte (24-31)
-printHex_AddEnt ROL.L   #8,D2		3214 -> 2143 middle-high byte in low
-		MOVE.L  D2,D0              
-		BSR.S   printHexByte	Print the high-middle byte (16-23)
-printHex_WrdEnt ROL.L   #8,D2		2143 -> 1432 Middle byte in low
-		MOVE.L  D2,D0
-		BSR.S   printHexByte	Print the middle byte (8-15)
-		ROL.L   #8,D2
-		MOVE.L  D2,D0
-		BSR.S   printHexByte	Print the low byte (0-7)
-    		MOVE.L	(SP)+,D2	Restore D2
-    		RTS		
+printHexWord	MOVE.L	D2,-(SP)	Save D2							*****
+		MOVE.L	D0,D2		Save address in D2					*****
+		ROL.L	#8,D2		4321 -> 3214						*****
+		ROL.L	#8,D2		3214 -> 2143						*****
+		BRA.S	printHex_WrdEnt	Print last 16 bits					*****
 
-printHexByte	MOVE.L	D2,-(SP)
-		MOVE.B	D0,D2
-		LSR.B	#$4,D0
-		ADD.B	#'0',D0
-		CMP.B	#'9',D0
-		BLE.S	.second
-		ADD.B	#7,D0
-.second		BSR.W	outChar
-		ANDI.B	#$0F,D2
-		ADD.B	#'0',D2
-		CMP.B	#'9',D2
-		BLE.S	.end
-		ADD.B	#7,D2
-.end		MOVE.B	D2,D0
-		BSR.W	outChar
-		MOVE.L	(SP)+,D2
-		RTS
 
+printHexAddr	MOVE.L	D2,-(SP)	Save D2							*****
+		MOVE.L	D0,D2		Save address in D2					*****
+		ROL.L	#8,D2		4321 -> 3214						*****
+		BRA.S	printHex_AddEnt	Print last 24 bits					*****
+
+
+printHexLong	MOVE.L  D2,-(SP)	Save D2							*****
+		MOVE.L  D0,D2		Save the address in D2					*****
+		ROL.L   #8,D2		4321 -> 3214 high byte in low				*****
+		MOVE.L  D2,D0									*****
+		BSR.S   printHexByte	Print the high byte (24-31)				*****
+												*****
+printHex_AddEnt ROL.L   #8,D2		3214 -> 2143 middle-high byte in low			*****
+		MOVE.L  D2,D0              							*****
+		BSR.S   printHexByte	Print the high-middle byte (16-23)			*****
+												*****
+printHex_WrdEnt ROL.L   #8,D2		2143 -> 1432 Middle byte in low				*****
+		MOVE.L  D2,D0									*****
+		BSR.S   printHexByte	Print the middle byte (8-15)				*****
+		ROL.L   #8,D2									*****
+		MOVE.L  D2,D0									*****		**
+		BSR.S   printHexByte	Print the low byte (0-7)				*****		****			
+    		MOVE.L	(SP)+,D2	Restore D2						**********************
+    		RTS										************************
+										**************************************
+										*********************		****
+										*********************		**
+
+
+printHexByte	MOVE.L	D2,-(SP)								************************
+		MOVE.B	D0,D2									************************
+		LSR.B	#$4,D0									************************
+		ADD.B	#'0',D0									*****
+		CMP.B	#'9',D0									*****	
+		BLE.S	.second									*****
+		ADD.B	#7,D0									*****
+.second		BSR.W	outChar									*****
+		ANDI.B	#$0F,D2									*****
+		ADD.B	#'0',D2									*****
+		CMP.B	#'9',D2									*****
+		BLE.S	.end									*****
+		ADD.B	#7,D2									*****
+.end		MOVE.B	D2,D0									*****		**
+		BSR.W	outChar									*****		****
+		MOVE.L	(SP)+,D2								**********************
+		RTS										************************
+										**************************************
+										*********************		****
+										*********************		**
 
 *****************************************************************************************************
 *****************************************************************************************************
