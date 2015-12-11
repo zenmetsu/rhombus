@@ -517,7 +517,9 @@ parseLine	MOVEM.L	A2-A3,-(SP)	Save registers						************************
 		BEQ.S	.exinter								*****
 		CMP.B	#' ',D0		Display a page (256 bytes)				*****
 		BEQ.S	.exinterpage								*****
-		BRA.S	.exit		Else exit						*****
+		CMP.B	#LF,D0		Disregard linefeeds					*****
+		BEQ.S	.exinterend	Fetch new character on LF				*****
+		BRA.S	.exit		Else exit on any other character			*****
 .exinterpage	MOVE.L	A3,A0									*****
 		MOVE.L	#$100,D0	256 bytes						*****
 		BSR.W	dumpRAM		Dump 16 lines						*****
