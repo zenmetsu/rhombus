@@ -182,7 +182,7 @@ memInit		EQU	*									*****
 		BEQ	NO_ERR		IF NONE, OUTPUT OK MESSAGE				*****
 		LEA.L	ERRMSG,A0	POINT TO TOP OF MESSAGE					*****
 		BSR.W	printString	PRINT MESSAGE						*****
-MEMFAIL		NOP			RAM FAILED IN FIRST 1K SO DO NOTHING, QUICKLY		*****
+MEMFAIL		NOP			RAM FAILED IN FIRST 2K SO DO NOTHING, QUICKLY		*****
 		BRA.S	MEMFAIL		AND KEEP DOING IT					*****
 												*****
 NO_ERR		EQU	*		INIT OK!						*****
@@ -191,7 +191,7 @@ NO_ERR		EQU	*		INIT OK!						*****
 		BSR.W	RAMsizer	Check RAM Size						*****
 												*****
 												*****      **
-		LEA.L	msgBanner,A0	Print Banner						*****    ****
+WARMSTART	LEA.L	msgBanner,A0	Print Banner						*****    ****
 		BSR.W	printString								*****  **********************
 PROMPT		LEA.L	msgPrompt,A0	Print prompt						*****************************
 		BSR.W	printString								*****  **********************
@@ -474,6 +474,7 @@ parseLine	MOVEM.L	A2-A3,-(SP)	Save registers						************************
 *   Examine											*****
 *												*****
 *   Modes:	e ADDR			Display a single byte					*****
+*		e ADDR.			Display a single page (16 lines, 256 bytes)		*****
 *		e ADDR-ADDR		Display all bytes between the two addresses		*****
 *		e ADDR+LEN		Displays LEN bytes following ADDR			*****
 *		e ADDR;			Interactive mode: SPACE shows 16 lines, ENTER shows 1	*****
@@ -525,26 +526,71 @@ parseLine	MOVEM.L	A2-A3,-(SP)	Save registers						************************
 		BSR.W	dumpRAM		Dump 16 lines						*****
 		ADD.L	#$100,A3	Adjust current address to match				*****
 		BRA.S	.exinterend								*****
-										*********************
-										*********************
-										*********************
-
-.deposit	BRA.W	.exit									*****
-												
-.run		BRA.W	.exit									*****
-												
+												  *
+												  *
+.deposit	MOVE.B	(A0),D0									*****
+		CMP.B	#':',D0		Check if continuing from previous address		*****
+		BEQ.S	.depCont								*****
+												*****
+		BSR.W	parseNumber	Read the address					*****
+		TST.B	D1		Make certain that it is valid				*****
+		BNE.S	.invalidAddr								*****
+												*****
+		MOVE.L	D0,A3		Save starting address					*****
+.depLoop	MOVE.B	(A0),D0									*****
+		CMP.B	#';',D0		Check for multi-line continuation			*****
+		BEQ.S	.depMultiline								*****
+		TST	D0		Check for end of line					*****
+		BEQ	.depEnd									*****
+												*****
+		BSR.S	parseNumber	Read value						*****
+		TST.B	D1		Test for validity					*****
+		BNE.S	.invalidVal								*****
+												*****
+		MOVE.B	D0,(A3)+	Store the value into memory				*****
+		BRA.S	.depLoop	...and fetch next value					*****
+												*****
+.depCont	MOVE.L	varCurAddr,A3	Read in the previous address				*****
+		ADDQ.L	#1,A0		Skip over the ':'					*****
+		BRA.S	.depLoop	...and fetch next value					*****
+												*****
+.depMultiline	LEA	msgDepPrompt,A0								*****
+		BSR.W	printString								*****
+		BSR.W	readLine	Read in the next line to be parsed			*****
+		BSR.W	convertCase	Convert case						*****
+		LEA	varLineBuf,A0	Reset buffer pointer					*****
+		BRA.S	.depLoop	Jump back to decoding					*****
+												*****
+.depEnd		MOVE.L	A3,varCurAddr								*****
+		BRA.W	.exit									*****
+												  *
+												  *
+.run		BSR.W	parseNumber	Read in the address					*****
+		TST.B	D1		Test for validity					*****
+		BNE.S	.invalidAddr								*****
+		MOVE.L	D0,A0									*****
+		JSR	(A0)		Wheeeeeeeeeeeeeeeeeeeee!!!!				*****
+		JSR	WARMSTART	Return to known state					*****
+												  *
+												  *
 .help		LEA	msgHelp,A0								*****
 		BSR.W	printString								*****
 		BRA.W	.exit									*****
-
+												  *
+												  *
 .invalidAddr	LEA	msgBadAddr,A0								*****
 		BSR.W	printString								*****
 		BRA.W	.exit									*****
-
+												  *
+												  *
 .invalidVal	LEA	msgBadVal,A0								*****
 		BSR.W	printString								*****
 		BRA.W	.exit									*****
-															*
+										*********************
+										*********************
+										*********************
+
+
 parseNumber	EOR.L	D0,D0		Clear D0						************************
 		MOVE.B	(A0)+,D0								************************
 		CMP.B	#' ',D0		Ignore leading spaces					************************
@@ -648,14 +694,14 @@ printHexWord	MOVE.L	D2,-(SP)	Save D2							*****
 		ROL.L	#8,D2		4321 -> 3214						*****
 		ROL.L	#8,D2		3214 -> 2143						*****
 		BRA.S	printHex_WrdEnt	Print last 16 bits					*****
-
-
+												 ***
+												  *
 printHexAddr	MOVE.L	D2,-(SP)	Save D2							*****
 		MOVE.L	D0,D2		Save address in D2					*****
 		ROL.L	#8,D2		4321 -> 3214						*****
 		BRA.S	printHex_AddEnt	Print last 24 bits					*****
-
-
+												 ***
+												  *
 printHexLong	MOVE.L  D2,-(SP)	Save D2							*****
 		MOVE.L  D0,D2		Save the address in D2					*****
 		ROL.L   #8,D2		4321 -> 3214 high byte in low				*****
@@ -727,6 +773,8 @@ msgBadAddr	DC.B	'Invalid Address',CR,LF,0
 msgBadVal	DC.B	'Invalid Value',CR,LF,0
 msgNewline	DC.B	CR,LF,0
 msgColonSpc	DC.B	': ',0
+
+msgDepPrompt	DC.B	': ',0
 
 msgHelp		DC.B	'Available Commands: ',CR,LF
 		DC.B	' [E]xamine	[D]eposit	[R]un	[H]elp',CR,LF,0
