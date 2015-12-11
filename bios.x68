@@ -255,7 +255,7 @@ MFPINIT		EQU	*		MC68901 INITIALIZATION ROUTINE				*****
 *		START TX/RX CLOCKS								*****
 		MOVE.B	#1,MFPRSR	START RECEIVER CLOCK					*****
 		MOVE.B	#5,MFPTSR	START TRANSMIT CLOCK				     ***********
-		BSET.B	#7,MFPGPDR	RAISE RTS					      *********
+		BSET.B	#7,MFPGPDR	RAISE RTS (INHIBIT RX)				      *********
 											       *******
 		RTS			DONE!  RETURN FROM ROUTINE				*****	
 												 ***
@@ -290,7 +290,7 @@ RAMsizer	EQU	*									*****
 .reportRAM	EQU	*									*****
 		SUBI.W	#$1,D3		Correct KB count due to failed test after increment	*****
 		LEA.L	msgRamFound1,A0								*****
-		BSR.S	printString								*****
+		BSR.W	printString								*****
 		BSR.S	.printVal								*****		**
 		LEA.L	msgRamFound2,A0								*****		****
 		BSR.S	printString								**********************
@@ -344,6 +344,7 @@ RAMsizer	EQU	*									*****
 		RTS			Else return without zero-padding			*****
 												*****
 .continue	ADDI.B	#'0',D1		Convert to ASCII					*****
+		BSET.B  #7,MFPGPDR	Negate RTS to inhibit receive				*****
 .wait		BTST.B  #7,MFPTSR	Check for empty transmit buffer				*****
                 BEQ.S   .wait		Loop until ready					*****
                 MOVE.B  D1,MFPUDR	Put character into USART data register			*****
@@ -364,9 +365,9 @@ printString	EQU	*									*****
 		BRA.S	.loop		Loop until null found					**********************
 .printEnd	RTS										************************
 												**********************
-outChar		EQU	*									*****		****
-		BTST.B	#7,MFPTSR	Check for empty transmit buffer				*****		**
-		BEQ.S	outChar		Loop until ready					*****
+outChar		BSET.B  #7,MFPGPDR	Negate RTS to inhibit receiving				*****		****
+.outloop	BTST.B	#7,MFPTSR	Check for empty transmit buffer				*****		**
+		BEQ.S	.outloop	Loop until ready					*****
 		MOVE.B	D0,MFPUDR	Put character into USART data register			*****
 		RTS			ELSE RETURN WHEN COMPLETED				*****
 										*********************
@@ -374,9 +375,9 @@ outChar		EQU	*									*****		****
 										*********************
 
 
-inChar		EQU	*									*****
-		BTST.B	#7,MFPRSR	Check for empty receive buffer				*****
-		BEQ.S	inChar		Loop until ready					*****
+inChar		BCLR.B  #7,MFPGPDR	Enable RTS to allow receiving				*****
+.poll		BTST.B	#7,MFPRSR	Check for empty receive buffer				*****
+		BEQ.S	.poll		Loop until ready					*****
 		MOVE.B	MFPUDR,D0								*****
 		RTS										*****
 
@@ -414,7 +415,7 @@ readLine	MOVEM.L	D2/A2,-(SP)	Preserve registers which will be modified		********
 		BEQ.S	.loop		If not, just ignore and fetch next character		*****
 		SUBA.L	D2,A2		Return to start of the buffer				*****
 .lineclearloop	MOVE.B	#BKSP,D0								*****
-		BSR.S	outChar		Backspace...						*****
+		BSR.W	outChar		Backspace...						*****
 		MOVE.B	#' ',D0									*****
 		BSR.W	outChar		Spaaaaaaaaaaaaace....					*****
 		MOVE.B	#BKSP,D0								*****
