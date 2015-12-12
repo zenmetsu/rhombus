@@ -95,7 +95,7 @@ LF		EQU	$0A								     ***********
 CR		EQU	$0D								      *********
 CTRLX		EQU	$18								       *******
 ESC		EQU	$1B									*****
-DEL		EQU	$7F									 ***
+												 ***
 												  *
 *****************************************************************************************************
 *****************************************************************************************************
@@ -388,8 +388,6 @@ readLine	MOVEM.L	D2/A2,-(SP)	Preserve registers which will be modified		********
 		EOR.W	D2,D2		Clear the character counter				************************
 .loop		BSR.S	inChar		Read a character from the UART buffer			*****
 		CMP.B	#BKSP,D0	Is user having difficulty typing?			*****
-		BEQ.S	.backspace								*****
-		CMP.B	#DEL,D0		Is the user having issues?				*****
 		BEQ.S	.backspace								*****
 		CMP.B	#CTRLX,D0	Is user having second thoughts?				*****
 		BEQ.S	.lineclear								*****
