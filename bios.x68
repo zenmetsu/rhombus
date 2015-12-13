@@ -299,6 +299,8 @@ RAMsizer	EQU	*									*****
 												**********************		
 .progress	EQU	*									*****		****
 												*****		**
+*					This is ugly as hell, I am looking at the BCD functions	*****
+*					supported by the CPU to clean this up a bit		*****
 .printVal	EQU	*									*****
 		EOR.L	D1,D1		Clear D1, will store character to be written		*****
 		EOR.L	D2,D2		Clear D2, will be zero until first character written	*****
@@ -747,6 +749,39 @@ printHexByte	MOVE.L	D2,-(SP)								************************
 										**************************************
 										*********************		****
 										*********************		**
+
+*****************************************************************************************************
+*****************************************************************************************************
+* TRAPS SECTION											*****
+												*****
+* TRAP 0											*****
+												*****
+
+* TRAP 1											*****
+*					Checks if RX buffer is full				*****
+*					And returns status in D1				*****
+												*****
+trapInCheck	BCLR.B	#7,MFPGPDR	Assert RTS to allow receiving				*****
+		EOR.L   D1,D1		D1 will store return, 1 = buffer full			*****
+		BTST.B	#7,MFPRSR	Check if character is still in RX buffer		*****
+		BEQ.S	.end		Bail if empty						*****
+		MOVEQ	#1,D1		Set return to indicate character waiting		*****
+.end		RTE			Return from exception					*****
+
+* TRAP 2				Returns a character via D0 from the UART		*****
+												*****
+trapInChar	BTST.B  #7,MFPRSR	Check for empty receive buffer				*****
+		BEQ.S	.end		Bail if nothing to return				*****
+		MOVE.B  MFPUDR,D0	Else move character to D0				*****
+.end		RTE			Return from exception					*****
+
+* TRAP 3				Outputs a character via the UART from D0		*****
+												*****
+trapOutChar	BSET.B  #7,MFPGPDR	Negate RTS to inhibit receiving				*****
+.outloop	BTST.B  #7,MFPTSR	Check for empty transmit buffer				*****
+		BEQ.S   .outloop	Loop until ready					*****
+		MOVE.B  D0,MFPUDR	Put character into USART data register			*****
+		RTE			Return from exception					*****
 
 *****************************************************************************************************
 *****************************************************************************************************
