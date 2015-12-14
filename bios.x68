@@ -179,7 +179,11 @@ memInit		EQU	*									*****
 												*****
 		BSR.S	MFPINIT		DO SO AS SUBROUTINE FOR LATER USE			*****
 												*****
-		TST	D7		NOW CHECK FOR MEMORY ERRORS				*****
+****************************************							*****
+*	Initialize the TRAP vectors								*****
+		BSR.W	setTrap15	Initialize IO TRAP15 vector				*****
+												*****
+		TST	D7		NOW CHECK IF THERE WERE MEMORY ERRORS			*****
 		BEQ	NO_ERR		IF NONE, OUTPUT OK MESSAGE				*****
 		LEA.L	ERRMSG,A0	POINT TO TOP OF MESSAGE					*****
 		BSR.W	printString	PRINT MESSAGE						*****
@@ -754,34 +758,85 @@ printHexByte	MOVE.L	D2,-(SP)								************************
 *****************************************************************************************************
 * TRAPS SECTION											*****
 												*****
+												*****
+
+setTrap0	RTS										*****
+
+setTrap15	MOVEQ	#32,D0		Traps start at vector 32				*****
+		ADDI.B	#15,D0		Add 15 for TRAP 15, this number chosen to be in line	*****
+		ASL.L	#2,D0		with the EAsy68k simulator	- multiply by 4		*****
+		ADDI.L	#RAMBAS,D0	since each vector is 2 words.  Add RAM offset		*****
+		MOVE.L	D0,A0		Put final location into address register		*****
+		MOVE.L	#trap15,(A0)	Initialize with IO exception handler address		*****
+		RTS			Return from subroutine					*****
 * TRAP 0											*****
 												*****
 
-* TRAP 1											*****
-*					Checks if RX buffer is full				*****
-*					And returns status in D1				*****
-												*****
-trapInCheck	BCLR.B	#7,MFPGPDR	Assert RTS to allow receiving				*****
-		EOR.L   D1,D1		D1 will store return, 1 = buffer full			*****
-		BTST.B	#7,MFPRSR	Check if character is still in RX buffer		*****
-		BEQ.S	.end		Bail if empty						*****
-		MOVEQ	#1,D1		Set return to indicate character waiting		*****
-.end		RTE			Return from exception					*****
+* TRAP 15				IO Exception						*****
+*					15 Chosen to match functionality with the EAsy68k sim	*****
+*					Value of D0 determines function				*****
+*												*****
 
-* TRAP 2				Returns a character via D0 from the UART		*****
-												*****
-trapInChar	BTST.B  #7,MFPRSR	Check for empty receive buffer				*****
-		BEQ.S	.end		Bail if nothing to return				*****
-		MOVE.B  MFPUDR,D0	Else move character to D0				*****
-.end		RTE			Return from exception					*****
+trap15		CMP.B	#0,D0		D0= 0 Display string at (A1),D1.W bytes long w/CR+LF	*****
+		BEQ.S	.io0		Branch to subroutine					*****
 
-* TRAP 3				Outputs a character via the UART from D0		*****
+		CMP.B	#1,D0		D0= 1 Display string at (A1),D1.W bytes long w/o CR+LF	*****
+		BEQ.S	.io1		Branch to subroutine					*****
+
+		CMP.B	#2,D0		D0= 2 Read UART string, store in (A1), null terminated	*****
+		BEQ.S	.io2		Branch to subroutine					*****
+
+		CMP.B	#3,D0		D0= 3 Display signed number D1.L dec in smallest field	*****
+		BEQ.S	.io3		Branch to subroutine					*****
+
+		CMP.B	#4,D0		D0= 4 Read number from UART into D1.L			*****
+		BEQ.S	.io4		Branch to subroutine					*****
+
+		CMP.B	#5,D0		D0= 5 Read single char from UART into D1.B		*****
+		BEQ.S	.io5		Branch to subroutine					*****
+
+		CMP.B	#6,D0		D0= 6 Display single character in D1.B			*****
+		BEQ.S	.io6		Branch to subroutine					*****
+
+		CMP.B	#7,D0		D0= 6 Set D1.B to 1 if UART RX buffer full, otherwise 0	*****
+		BEQ.S	.io7		Branch to subroutine					*****
+
+		CMP.B	#8,D0		D0= 6 Display single character in D1.B			*****
+		BEQ.S	.io8		Branch to subroutine					*****
+
+
+.ioExcEnd	RTE			Return from exception					*****
+
+.io0		BEQ.S	.ioExcEnd	Return from exception					*****
+
+.io1		BEQ.S	.ioExcEnd	Return from exception					*****
+
+.io2		BEQ.S	.ioExcEnd	Return from exception					*****
+
+.io3		BEQ.S	.ioExcEnd	Return from exception					*****
+
+.io4		BEQ.S	.ioExcEnd	Return from exception					*****
+
 												*****
-trapOutChar	BSET.B  #7,MFPGPDR	Negate RTS to inhibit receiving				*****
+.io5		BTST.B  #7,MFPRSR	Check for empty receive buffer				*****
+		BEQ.S	.ioExcEnd	Bail if nothing to return				*****
+		MOVE.B  MFPUDR,D1	Else move character to D1				*****
+.end		BEQ.S	.ioExcEnd	Return from exception					*****
+
+.io6		BSET.B  #7,MFPGPDR	Negate RTS to inhibit receiving				*****
 .outloop	BTST.B  #7,MFPTSR	Check for empty transmit buffer				*****
 		BEQ.S   .outloop	Loop until ready					*****
-		MOVE.B  D0,MFPUDR	Put character into USART data register			*****
-		RTE			Return from exception					*****
+		MOVE.B  D1,MFPUDR	Put character into USART data register			*****
+		BEQ.S	.ioExcEnd	Return from exception					*****
+
+.io7		BCLR.B	#7,MFPGPDR	Assert RTS to allow receiving				*****
+		EOR.L   D1,D1		D1 will store return, 1 = buffer full			*****
+		BTST.B	#7,MFPRSR	Check if character is still in RX buffer		*****
+		BEQ.S	.ioExcEnd	Bail if empty						*****
+		MOVEQ	#1,D1		Set return to indicate character waiting		*****
+		BEQ.S	.ioExcEnd	Return from exception					*****
+
+.io8		BEQ.S	.ioExcEnd	Return from exception					*****
 
 *****************************************************************************************************
 *****************************************************************************************************
