@@ -328,12 +328,13 @@ RAMsizer	EQU	*									*****
 		BSR.W	printString								*****
 		RTS			Return from RAMsizer					*****
 												*****
-.progress	EQU	*									*****
+.progress	MOVE.L	A0,-(SP)								*****
 		LEA.L	msgRamFound1,A0								*****
 		BSR.W	printString								*****
 		BSR.S	.printVal								*****
 		LEA.L	msgRamFound2,A0								*****
 		BSR.W	printString								*****
+		MOVE.L	(SP)+,A0								*****
 		RTS										*****
 												*****
 *					This is ugly as hell, I am looking at the BCD functions	*****
