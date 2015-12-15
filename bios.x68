@@ -288,6 +288,7 @@ RAMsizer	EQU	*									*****
 		MOVE.B	D2,(A1,D1)	Retest memory location					*****
 		CMP.B	(A1,D1),D2	Compare to see if write was successful			*****
 		BNE.S	.reportRAM	If failure, report size of detected RAM			*****
+		BSR.S	.progress	Print progess						*****
                 ADDI.L	#$400,D1	Increment test point by 1KB				*****
 		ADDI.W	#$1,D3									*****
 		BRA.S	.loopSiz	Loop until failure					*****
@@ -297,12 +298,44 @@ RAMsizer	EQU	*									*****
 		LEA.L	msgRamFound1,A0								*****
 		BSR.W	printString								*****
 		BSR.S	.printVal								*****		**
-		LEA.L	msgRamFound2,A0								*****		****
-		BSR.S	printString								**********************
-		RTS			Exit RAMsizer						************************
+		LEA.L	msgRamFound3,A0								*****		****
+		BSR.W	printString								**********************
+												************************
 												**********************		
-.progress	EQU	*									*****		****
-												*****		**
+.testRAM	LEA.L	msgRamTest1,A0								*****		****
+		BSR.W	printString								*****		**
+		CLR.L	D0		Clear D0, Inner loop counter				*****
+		SUBQ	#1,D0		Subtract 1						*****
+		SUBQ	#2,D3		Subtract the 2KB that was initially tested		*****
+		MULU.W	#$400,D3	Multiply D3 by 1K					*****
+		ADD.L	D3,D0		Initialize inner loop counter				*****
+		MOVE.L	D0,D4		Store RAM Size						*****
+		MOVE.L	#3,D3		Initialize outer loop counter				*****
+		LEA.L	RAMBAS,A0	Point to base of RAM					*****
+		ADDA.L	#$800,A0	Add 2K to avoid stack					*****
+		LEA.L	MEMDAT,A1	Point to memory exerciser data				*****
+.testloop0	MOVE.L	D4,D0		Retrieve memory size					*****
+		MOVE.B	(A1,D3),D2	Get memory data						*****
+.testloop1	MOVE.B	D2,(A0,D0)	Write to memory						*****
+		CMP.B	(A0,D0),D2	Compare with stored data				*****
+		BEQ.S	.testloop1_1	Jump if match						*****
+		ADDQ	#1,D7		Else increment error count				*****
+.testloop1_1	DBRA	D0,.testloop1	Test all of RAM						*****
+		DBRA	D3,.testloop0	For all data types					*****
+		MOVE.L	D7,D3									*****
+		BSR.S	.printVal								*****
+		LEA.L	msgRamTest2,A0								*****
+		BSR.W	printString								*****
+		RTS			Return from RAMsizer					*****
+												*****
+.progress	EQU	*									*****
+		LEA.L	msgRamFound1,A0								*****
+		BSR.W	printString								*****
+		BSR.S	.printVal								*****
+		LEA.L	msgRamFound2,A0								*****
+		BSR.S	printString								*****
+		RTS										*****
+												*****
 *					This is ugly as hell, I am looking at the BCD functions	*****
 *					supported by the CPU to clean this up a bit		*****
 .printVal	EQU	*									*****
@@ -859,9 +892,12 @@ msgPrompt	DC.B	'>',0									*****
 msgRamSizing	DC.B	'RAM detection in progress...',CR,LF,0					*****
 												*****
 msgRamFound1	DC.B	CR,'Detected: ',0							*****
-msgRamFound2	DC.B	'KB',CR,LF,LF,0								*****
+msgRamFound2	DC.B	'KB',CR,0								*****
+msgRamFound3	DC.B	'KB',CR,LF,LF,0								*****
 												*****
-msgNoCMD	DC.B	'Invalid Command',CR,LF,0
+msgRamTest1	DC.B	'Testing RAM...',CR,LF,0						*****
+msgRamTest2	DC.B	' errors found',CR,LF,0							*****
+msgNoCMD	DC.B	'Invalid Command',CR,LF,0						*****
 msgBadAddr	DC.B	'Invalid Address',CR,LF,0
 msgBadVal	DC.B	'Invalid Value',CR,LF,0
 msgNewline	DC.B	CR,LF,0
