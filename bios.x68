@@ -333,12 +333,12 @@ RAMsizer	EQU	*									*****
 		BSR.W	printString								*****
 		BSR.S	.printVal								*****
 		LEA.L	msgRamFound2,A0								*****
-		BSR.S	printString								*****
+		BSR.W	printString								*****
 		RTS										*****
 												*****
 *					This is ugly as hell, I am looking at the BCD functions	*****
 *					supported by the CPU to clean this up a bit		*****
-.printVal	EQU	*									*****
+.printVal	MOVEM.L	D1-D2,-(SP)	Store register contents					*****
 		EOR.L	D1,D1		Clear D1, will store character to be written		*****
 		EOR.L	D2,D2		Clear D2, will be zero until first character written	*****
 .loop10000	CMPI.W	#$2710,D3	Compare to 10000					*****
@@ -374,7 +374,7 @@ RAMsizer	EQU	*									*****
 .print10	BSR.S   .printChar								*****
                 MOVE.B   D3,D1		Clear D1, will store character to be written		*****
 		BSR.S	.printChar	No need to loop on 1s digit				*****
-												*****
+		MOVEM.L	(SP)+,D1-D2	Restore register contents				*****
 		RTS			GTFO							*****
 												*****
 .printChar	TST.B	D1		Test if digit is zero					*****
