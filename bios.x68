@@ -373,7 +373,7 @@ RAMsizer	EQU	*									*****
 												*****
 .print10	BSR.S   .printChar								*****
                 MOVE.B   D3,D1		Clear D1, will store character to be written		*****
-		BSR.S	.printChar	No need to loop on 1s digit				*****
+		BSR.S	.continue	No need to loop on 1s digit				*****
 		MOVEM.L	(SP)+,D1-D2	Restore register contents				*****
 		RTS			GTFO							*****
 												*****
@@ -892,7 +892,7 @@ msgPrompt	DC.B	'>',0									*****
 msgRamSizing	DC.B	'RAM detection in progress...',CR,LF,0					*****
 												*****
 msgRamFound1	DC.B	CR,'Detected: ',0							*****
-msgRamFound2	DC.B	'KB',CR,0								*****
+msgRamFound2	DC.B	'KB      ',CR,0								*****
 msgRamFound3	DC.B	'KB',CR,LF,LF,0								*****
 												*****
 msgRamTest1	DC.B	'Testing RAM...',CR,LF,0						*****
