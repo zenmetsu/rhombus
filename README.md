@@ -17,8 +17,11 @@ via configuration.
 
 The system board currently consists of CPU, RAM, ROM, and a Xilinx XC95108 CPLD.
 
+RAM sizing and error checking is in place.
+
 Next steps:
-Proper RAM sizing/detection and testing.
+Code cleanup to reduce ROM size and increase efficiency
+S-Record load over serial
 Increasing RAM data bus to 32bits.  ROM to remain 8bit due to simplicity of flashing devices.
 Floppy drive interface
 PS/2 Keyboard
