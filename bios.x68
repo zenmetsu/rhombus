@@ -130,7 +130,7 @@ ROMSTART	EQU	*		BEGINNING OF PROGRAM SECTION				*****
 *   MEMORY EXERCISER 										*****
 *	This routine performs a quick check of memory prior to					*****
 *	proceeding.  The count of errors is stored in D7 at completion				*****
-												*****
+*	We avoid using stack until the first 2K of RAM is deemed safe				*****
 		CLR.L	D7		CLEAR ERROR COUNTER					*****
 		MOVE.L	#3,D3		INIT OUTER LOOP COUNTER					*****
 		LEA.L	RAMBAS,A0	POINT TO BASE OF RAM					*****
@@ -194,6 +194,13 @@ NO_ERR		EQU	*		INIT OK!						*****
 		LEA.L	OKMSG,A0	POINT TO TOP OF MESSAGE					*****
 		BSR.W	printString	Output messsage over serial port			*****
 		BSR.W	RAMsizer	Check RAM Size						*****
+		MOVE.L	#$800,D0	Point D0 at base of non-stack RAM			*****
+		MOVE.L	D3,D1		Copy size of detected RAM to D1				*****
+		SUBQ	#2,D1		Subtract 2KB from total RAM as we will not check stack	*****
+		MULU.W	#$400,D1	Multiply by 1024 per KB					*****
+		SUBQ	#1,D1		Subtract 1, we start counting at zero			*****
+		ADD.L	D0,D1		Add size (D1) to non-stack offset (D0) to get high addr	*****	
+		BSR.W	RAMcheck	Check remaining RAM for errors				*****
 												*****
 												*****      **
 WARMSTART	LEA.L	msgBanner,A0	Print Banner						*****    ****
@@ -273,14 +280,44 @@ MFPINIT		EQU	*		MC68901 INITIALIZATION ROUTINE				*****
 
 ****************************************							*************************
 * RAM checker and diagnostic									*************************
-												*************************
-RAMcheck	EQU	*									*****
-		RTS										*****
+*												*************************
+*					D0 stores lowest memory address to check		*****
+*					D1 stores highest memory address to check		*****
+*					D7 returns number of failed bytes			*****
+												*****
+RAMcheck	MOVEM.L	D2-D4/A0-A1,-(SP)	Save modified registers				*****
+		LEA.L   msgRamTest1,A0	Point to top of message					*****
+                BSR.W   printString	Print message						*****
+		MOVE.L	D0,A0		Point A0 at lowest memory address			*****
+                SUB.L	D1,D0		Subtract to get range, yes this will be negative	*****
+		NEG.L	D0		Now D0 is positive, unless there was derp		*****
+                MOVE.L  D0,D4           Store RAM Size                                          *****
+                MOVE.L  #3,D3           Initialize outer loop counter                           *****
+                LEA.L   MEMDAT,A1       Point to memory exerciser data                          *****
+.chkloop0	MOVE.L  D4,D0           Retrieve memory size                                    *****
+                MOVE.B  (A1,D3),D2      Get memory data                                         *****
+.chkloop1	MOVE.B  D2,(A0,D0)      Write to memory                                         *****
+                CMP.B   (A0,D0),D2      Compare with stored data                                *****
+                BEQ.S   .chkloop1_1	Jump if match                                           *****
+                ADDQ    #1,D7           Else increment error count                              *****
+.chkloop1_1	DBRA    D0,.chkloop1	Test all of RAM                                         *****
+                DBRA    D3,.chkloop0	For all data types                                      *****
+                MOVE.L  D7,D3                                                                   *****
+                BSR.W	printVal								*****
+                LEA.L   msgRamTest2,A0                                                          *****		**
+                BSR.W   printString                                                             *****		****
+		MOVEM.L	(SP)+,D2-D4/A0-A1	Restore modified registers			**********************
+                RTS                     Return from RAMcheck					************************
+										**************************************
+										*********************		****
+										*********************		**
+
 
 
 ****************************************							*************************
 * RAM sizer and diagnostic									*************************
-												*************************
+*					D3 stores size of detected RAM in KB after completion	*************************
+
 RAMsizer	EQU	*									*****
 		LEA.L	msgRamSizing,A0								*****
 		BSR.W   printString     Output messsage over serial port			*****
@@ -304,41 +341,18 @@ RAMsizer	EQU	*									*****
 		SUBI.W	#$1,D3		Correct KB count due to failed test after increment	*****
 		LEA.L	msgRamFound1,A0								*****
 		BSR.W	printString								*****
-		BSR.S	.printVal								*****		**
+		BSR.S	printVal								*****		**
 		LEA.L	msgRamFound3,A0								*****		****
 		BSR.W	printString								**********************
-												************************
+		RTS			Return from RAMsizer					************************
 												**********************		
-.testRAM	LEA.L	msgRamTest1,A0								*****		****
-		BSR.W	printString								*****		**
-		CLR.L	D0		Clear D0, Inner loop counter				*****
-		SUBQ	#1,D0		Subtract 1						*****
-		SUBQ	#2,D3		Subtract the 2KB that was initially tested		*****
-		MULU.W	#$400,D3	Multiply D3 by 1K					*****
-		ADD.L	D3,D0		Initialize inner loop counter				*****
-		MOVE.L	D0,D4		Store RAM Size						*****
-		MOVE.L	#3,D3		Initialize outer loop counter				*****
-		LEA.L	RAMBAS,A0	Point to base of RAM					*****
-		ADDA.L	#$800,A0	Add 2K to avoid stack					*****
-		LEA.L	MEMDAT,A1	Point to memory exerciser data				*****
-.testloop0	MOVE.L	D4,D0		Retrieve memory size					*****
-		MOVE.B	(A1,D3),D2	Get memory data						*****
-.testloop1	MOVE.B	D2,(A0,D0)	Write to memory						*****
-		CMP.B	(A0,D0),D2	Compare with stored data				*****
-		BEQ.S	.testloop1_1	Jump if match						*****
-		ADDQ	#1,D7		Else increment error count				*****
-.testloop1_1	DBRA	D0,.testloop1	Test all of RAM						*****
-		DBRA	D3,.testloop0	For all data types					*****
-		MOVE.L	D7,D3									*****
-		BSR.S	.printVal								*****
-		LEA.L	msgRamTest2,A0								*****
-		BSR.W	printString								*****
-		RTS			Return from RAMsizer					*****
+												*****		****
+												*****		**
 												*****
 .progress	MOVE.L	A0,-(SP)								*****
 		LEA.L	msgRamFound1,A0								*****
 		BSR.W	printString								*****
-		BSR.S	.printVal								*****
+		BSR.S	printVal								*****
 		LEA.L	msgRamFound2,A0								*****
 		BSR.W	printString								*****
 		MOVE.L	(SP)+,A0								*****
@@ -346,7 +360,7 @@ RAMsizer	EQU	*									*****
 												*****
 *					This is ugly as hell, I am looking at the BCD functions	*****
 *					supported by the CPU to clean this up a bit		*****
-.printVal	MOVEM.L	D1-D3,-(SP)	Store register contents					*****
+printVal	MOVEM.L	D1-D3,-(SP)	Store register contents					*****
 		EOR.L	D1,D1		Clear D1, will store character to be written		*****
 		EOR.L	D2,D2		Clear D2, will be zero until first character written	*****
 .loop10000	CMPI.W	#$2710,D3	Compare to 10000					*****
@@ -380,13 +394,13 @@ RAMsizer	EQU	*									*****
 		BRA.S	.loop10		Repeate until less than 10				*****
 												*****
 .print10	BSR.S   .printChar								*****
-                MOVE.B   D3,D1		Clear D1, will store character to be written		*****
-		BSR.S	.continue	No need to loop on 1s digit				*****
-		MOVEM.L	(SP)+,D1-D3	Restore register contents				*****
-		RTS			GTFO							*****
-												*****
-.printChar	TST.B	D1		Test if digit is zero					*****
-		BNE.S	.continue	Print if not						*****
+                MOVE.B   D3,D1		Clear D1, will store character to be written		*****			**
+		BSR.S	.continue	No need to loop on 1s digit				*****			****
+		MOVEM.L	(SP)+,D1-D3	Restore register contents				******************************
+		RTS			GTFO							********************************
+												******************************
+.printChar	TST.B	D1		Test if digit is zero					*****			****
+		BNE.S	.continue	Print if not						*****			**
 		TST.B	D2		Else test if this would be first printed digit		*****
 		BNE.S	.continue	Print if not						*****
 		RTS			Else return without zero-padding			*****
