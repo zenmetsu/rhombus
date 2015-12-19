@@ -1,0 +1,44 @@
+NET "FC0" LOC="1";
+NET "FC1" LOC="2";
+NET "FC2" LOC="3";
+
+NET "_BERR"  LOC="4";
+NET "_BGACK" LOC="5";
+NET "_BR"    LOC="6";
+NET "_AS"    LOC="7";
+NET "_MFPDTACK" LOC="58";
+
+NET "CLK_RAW"      LOC="S:PIN9";
+NET "SYSCLK" LOC="11";
+
+
+
+NET "_DSACK0" LOC="12";
+NET "_DSACK1" LOC="13";
+NET "_IPL0"   LOC="14";
+NET "_IPL1"   LOC="15";
+
+NET "_RESET"     LOC="17";
+NET "_HALT"   LOC="18";
+NET "_CDIS"   LOC="19";
+NET "_AVEC"   LOC="20";
+
+NET "_ROMSEL"   LOC="70";
+NET "_RAMSEL"   LOC="66";
+NET "_MFPSEL"   LOC="68";
+
+NET "MFPCLK" LOC="63";
+
+NET "_MFPIACK"  LOC="56";
+
+NET "A00"  LOC="72";
+NET "A01"  LOC="74";
+NET "A02"  LOC="75";
+NET "A16"  LOC="41";
+NET "A17"  LOC="43";
+NET "A18"  LOC="44";
+NET "A19"  LOC="45";
+NET "A20"  LOC="46";
+NET "A21"  LOC="47";
+NET "A22"  LOC="48";
+NET "A23"  LOC="50";
