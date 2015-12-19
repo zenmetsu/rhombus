@@ -195,7 +195,7 @@ NO_ERR		EQU	*		INIT OK!						*****
 		LEA.L	OKMSG,A0	POINT TO TOP OF MESSAGE					*****
 		BSR.W	printString	Output messsage over serial port			*****
 		BSR.W	RAMsizer	Check RAM Size						*****
-		MOVE.L	#$800,D0	Point D0 at base of non-stack RAM			*****
+		MOVE.L	#$F00800,D0	Point D0 at base of non-stack RAM			*****
 		MOVE.L	D3,D1		Copy size of detected RAM to D1				*****
 		SUBQ	#2,D1		Subtract 2KB from total RAM as we will not check stack	*****
 		MULU.W	#$400,D1	Multiply by 1024 per KB					*****
