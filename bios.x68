@@ -181,6 +181,7 @@ memInit		EQU	*									*****
 												*****
 ****************************************							*****
 *	Initialize the TRAP vectors								*****
+		BSR.W	setTrap1	Initialize MFP GPIO TRAP1 vector			*****
 		BSR.W	setTrap15	Initialize IO TRAP15 vector				*****
 												*****
 		TST	D7		NOW CHECK IF THERE WERE MEMORY ERRORS			*****
