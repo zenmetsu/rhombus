@@ -817,6 +817,14 @@ printHexByte	MOVE.L	D2,-(SP)								************************
 
 setTrap0	RTS										*****
 
+setTrap1	MOVEQ	#32,D0		Traps start at vector 32				*****
+		ADDI.B	#1,D0		Add 1 for TRAP 1					*****
+		ASL.L	#2,D0		Multiply by 4 since each vector occupies 2 words	*****
+		ADDI.L	#RAMBAS,D0	Add RAM offset since vector table starts there		*****
+		MOVE.L	D0,A0		Put final location into address register		*****
+		MOVE.L	#trap1,(A0)	Initialize with exception handler address		*****
+		RTS			Return from subroutine					*****
+
 setTrap15	MOVEQ	#32,D0		Traps start at vector 32				*****
 		ADDI.B	#15,D0		Add 15 for TRAP 15, this number chosen to be in line	*****
 		ASL.L	#2,D0		with the EAsy68k simulator	- multiply by 4		*****
@@ -826,6 +834,19 @@ setTrap15	MOVEQ	#32,D0		Traps start at vector 32				*****
 		RTS			Return from subroutine					*****
 * TRAP 0											*****
 												*****
+
+* TRAP 1				MFP GPIO Exception					*****
+*					Value in D0 represents a GPIO 8 bit mask		*****
+*					Value in D1 determines status of GPIO, 0=off, other=on	*****
+trap1		TST.B	D1		Check if turning GPIO pins on or off			*****
+		BNE.S	.gpio1		Jump to pin assertion if not zero			*****
+		MOVE.B	MFPGPDR,D1	Store GPIO Data Register in D1				*****
+		AND.B	D0,D1		Logical AND the contents of MFPGPDR with mask		*****
+		SUB.B	D1,MFPGPDR	Subtract result from MFP GPIO Data Register		*****
+		RTE			Return from exception					*****
+.gpio1		OR.B	D0,MFPGPDR	Logical OR to assert all pins in mask if not already 1	*****
+		RTE			Return from exception					*****	
+
 
 * TRAP 15				IO Exception						*****
 *					15 Chosen to match functionality with the EAsy68k sim	*****
@@ -907,7 +928,7 @@ ERRMSG		DC.B	'<RESET>',CR,LF								*****
 msgBanner	DC.B	'============================',CR,LF					*****
 		DC.B	'RHOMBUS 68020 System Monitor',CR,LF					*****
 		DC.B	'============================',CR,LF					*****
-		DC.B	'ver 0.2	  12-DEC-2015',CR,LF,0					*****
+		DC.B	'ver 0.3	  18-DEC-2015',CR,LF,0					*****
 												*****
 msgPrompt	DC.B	'>',0									*****
 												*****
