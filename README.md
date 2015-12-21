@@ -15,12 +15,13 @@ The provided schematic omitted these connections and the documentation for the m
 leaves much to be desired, leading one to suspect that the clock could be passed internally 
 via configuration.
 
-The system board currently consists of CPU, RAM, ROM, and a Xilinx XC95108 CPLD.
+The system board currently consists of CPU, RAM, ROM, an MC68901 multifunction peripheral, and a Xilinx XC95108 CPLD.
 
-RAM sizing and error checking is in place.
+RAM sizing and error checking is in place.  Monitor has the ability to analyze or change memory contents.
 
 Next steps:
 Code cleanup to reduce ROM size and increase efficiency
+Addition of an MC68681 DUART which will work as auxillary serial port as well as keyboard input
 S-Record load over serial
 Increasing RAM data bus to 32bits.  ROM to remain 8bit due to simplicity of flashing devices.
 Floppy drive interface
