@@ -366,7 +366,7 @@ printVal	MOVEM.L	D1-D3,-(SP)	Store register contents					*****
 		EOR.L	D1,D1		Clear D1, will store character to be written		*****
 		EOR.L	D2,D2		Clear D2, will be zero until first character written	*****
 .loop10000	CMPI.W	#$2710,D3	Compare to 10000					*****
-		BLT.S	.print10000	Branch if less than					*****
+		BCS.S	.print10000	Branch if less than					*****
 		SUBI.W	#$2710,D3	Subtract 10000						*****
 		ADDI.B	#$1,D1		Increment digit to be written				*****
 		BRA.S	.loop10000	Repeat until less than 10000				*****
