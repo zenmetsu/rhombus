@@ -34,14 +34,24 @@
 * Equates section										*****
 												*****
 ****************************************							*****
+*   Defines											*****
+												*****
+NOP		EQU	$4E71		STANDARD 68000 NOP INSTRUCTION				*****
+MEMDAT		EQU	*		MEMORY EXERCISER DATA					*****	
+		DC.B	$5									*****
+		DC.B	$A									*****
+		DC.B	$0									*****
+		DC.B	$F									*****
+												*****
+****************************************							*****
 *   Addresses											*****
 												*****
 ROMBAS		EQU	0		ROM BASE ADDRESS					*****
 RAMBAS		EQU	$F00000		RAM BASE ADDRESS					*****
 MFPBAS		EQU	$EF0000		MFP BASE ADDRESS					*****
 MFPVCT		EQU	$40		VECTOR FOR MFP SOURCED INTERRUPT			*****
-STACK		EQU	$800									*****
-
+STACK		EQU	$F0800									*****
+												*****
 ****************************************							*****
 *   MC68901 MFP Registers									*****
 												*****
@@ -74,7 +84,7 @@ MFPUDR		EQU     MFPBAS+$2F	USART DATA REGISTER					*****
 *   Environment Parameter Equates								*****
 												*****
 MAXCHR		EQU	64		MAXIMUM LENGTH OF COMMAND LINE				*****
-DATA		EQU	$800		DATA ORIGIN						*****
+DATA		EQU	$F0800		DATA ORIGIN						*****
 LNBUF		DS.B	MAXCHR		COMMAND LINE BUFFER					*****
 BUFEND		EQU	LNBUF+MAXCHR-1	END OF COMMAND LINE POINTER				*****
 BUFPT		DS.L	1		COMMAND LINE POINTER					*****
@@ -117,6 +127,8 @@ RESET		EQU	*		COLD ENTRY POINT					*****
 		LEA	DATA,A6		POINT A6 TO DATA AREA					*****
 		CLR.L	UCOMTAB(A6)	RESET USER COMMAND TABLE POINTER			*****
 		BSR.S	CFGUART		CONFIGURE UART						*****
+		BSR.S	LORAMINIT	INITIALIZE VBR AND STACK SPACE, LOWEST 2K OF RAM	*****
+		BSR	EXCSET		SET UP EXCEPTION TABLE					*****
 WARM		EQU	*
 		NOP
 		BRA	WARM
@@ -126,15 +138,169 @@ WARM		EQU	*
 * INITIALIZATION SECTION                                                                        *****
                                                                                                 *****
 CFGUART		EQU	*
+		BSR.W	MFPINIT
 		RTS
+
+NEWLINE		EQU	*
+		RTS
+
+LORAMINIT	EQU	*		THIS WILL TEST AND PREP LOWEST 2K OF RAM 		*****
+*	This routine performs a quick check of memory prior to					*****
+*	proceeding.  The count of errors is stored in D7 at completion				*****
+*	We avoid using stack until the first 2K of RAM is deemed safe				*****
+		CLR.L	D7		CLEAR ERROR COUNTER					*****
+		MOVE.L	#3,D3		INIT OUTER LOOP COUNTER					*****
+		LEA.L	RAMBAS,A0	POINT TO BASE OF RAM					*****
+		LEA.L	MEMDAT,A1	POINT TO MEMORY EXERCISER DATA				*****
+												*****
+.loop0		EQU	*									*****
+		MOVE.L	#$7FF,D0	INIT INNER LOOP COUNTER, INITIALLY CHECK 2K		*****
+		MOVE.B	(A1,D3),D2	GET MEMORY DATA						*****
+												*****
+.loop1		EQU	*									*****
+		MOVE.B	D2,(A0,D0)	PUT DATA INTO MEMORY					*****
+		CMP.B	(A0,D0),D2	COMPARE WITH STORED DATA				*****
+		BEQ.S	.loop1_1	JUMP IF MATCHES						*****
+		ADDQ	#1,D7		ELSE INCREMEMBT ERROR COUNT				*****
+												*****
+.loop1_1		EQU	*								*****
+		DBRA	D0,.loop1	TEST ALL OF RAM						*****
+		DBRA	D3,.loop0	FOR ALL DATA TYPES (4 TESTS)				*****
+												*****
+*	When memory test completes, memory is initialized with NOPs and vector table 		*****
+*       is initialized with address of generic handler.						*****
+*	After initialization, D7 will contain the number of errors from the test section	*****
+												*****
+memInit		EQU	*									*****
+		LEA.L	RAMBAS,A0	POINT AT BASE OF RAM AGAIN				*****
+		MOVE.L	#$7FE,D0	USE AS LOOP COUNTER FOR MEMINIT				*****
+		MOVE.L	#$3FE,D2	POINT TO BOTTOM OF VECTOR TABLE				*****
+		MOVE.W	#NOP,D1		FILL NON-VECTOR MEMORY WITH NOPs			*****
+												*****
+.loop2		EQU	*									*****
+		MOVE.W	D1,(A0,D0)	PUT DATA INTO MEMORY					*****
+		SUBQ	#2,D0		DECREMENT COUNTER					*****
+		CMP.L	D0,D2		LOOK FOR BOTTOM OF VECTOR TABLE				*****
+		BNE.S	.loop2		LOOP UNTIL BOTTOM OF VECTOR TABLE			*****
+		SUBQ	#2,D0		ELSE MOVE TO LONG-WORD INIT				*****
+		MOVE.L	#EXCHND,D1	PUT GENERIC EXCEPTION HANDLER IN REST OF VECTOR TABLE	*****
+												*****
+.loop3		EQU	*									*****
+		MOVE.L	D1,(A0,D0)	PUT HANDLER ADDRESS THERE				*****
+		SUBQ	#4,D0		AND DECREMENT POINTER					*****
+		BGE.S	.loop3		FILL REST OF MEMORY					*****
+		RTS										*****		
+		
+
+EXCSET		EQU	*		SET UP EXCEPTION TABLE
+		MOVE.L	#RAMBAS,D0	POINT TO BASE OF RAM					*****
+		MOVEC.L	D0,VBR		INITIALIZE VBR						*****
+		LEA	RAMBAS,A0	POINT TO VECTOR BASE					*****
+		MOVE.L	#ER_BUS,8(A0)	SET UP BUS ERROR EXCEPTION				*****
+		MOVE.L	#ER_ADDR,12(A0)	SET UP ADDRESS ERROR EXCEPTION				*****
+		MOVE.L	#ER_ILOP,16(A0) SET UP ILLEGAL OPERATION EXCEPTION			*****
+		MOVE.L	#TRACE,36(A0)	SET UP TRACE EXCEPTION					*****
+		MOVE.L	#TRAP0,128(A0)	SET UP TRAP #0 EXCEPTION				*****
+		MOVE.L	#BRKPT,184(A0)	SET UP TRAP #14 = BREAKPOINT VECTOR			*****
+		MOVE.L	#WARM,188(A0)	SET UP TRAP #15 EXCEPTION VECTOR			*****
+		
+		MOVE.W	#7,D0		CLEAR THE BREAKPOINT TABLE				*****
+		LEA	BKPTAB(A6),A0	POINT TO TABLE						*****
+EXCSET_2	CLR.L	(A0)+		CLEAR AN ADDRESS ENTRY					*****
+		CLR.W	(A0)+		CLEAR A DATA ENTRY					*****
+		DBRA	D0,EXCSET_2	REPEAT FOR REMAINING TABLE ENTRIES			*****
+		RTS
+
+TRAP0		EQU	*		
+		CMP.B	#0,D1		D1 =  0 = Get character					*****
+		BNE.S	TRAP1									*****
+		BSR	GETCHAR
+		RTE
+
+
+*****************************************************************************************************
+*****************************************************************************************************
+* INPUT/OUTPUT SUBROUTINES SECTION								*****
+												*****
+IO_REQ		MOVEM.L	A0-A1,-(A7)	BACK UP REGISTERS					*****
+		LEA	8(A0),A1	A1 POINTS TO DEVICE HANDLER FIELD			*****
+		MOVE.L	(A1),A1		A1 CONTAINS DEVICE HANDLER ADDRESS			*****
+		JSR	(A1)		CALL DEVICE HANDLER					*****
+		MOVEM.L	(A7)+,A0-A1	RESTORE REGISTERS					*****
+		RTS										*****
+												 ***
+CON_IN		MOVEM.L	D1/A1,-(A7)	BACK UP REGISTERS					*****
+		LEA	12(A0),A1	GET POINTER TO DEVICE FROM DCB				*****
+		MOVE.L	(A1),A1		PUT ADDRESS OF DEVICE IN A1				*****
+		CLR.B	19(A0)		CLEAR LOGICAL ERROR IN DCB				*****
+		BCLR.B	#7,$1(A1)	ENABLE RTS TO ALLOW RECEIVE				*****
+CON_I1		MOVE.B	$2B(A1),D1	READ RECEIVE STATUS REGISTER				*****
+		BTST	#7,D1		CHECK RECEIVE BUFFER FULL				*****
+		BEQ.S	CON_I1		LOOP UNTIL READY					*****
+		MOVE.B	D1,18(A0)	STORE RECEIVER STATUS REGISTER IN DCB			*****
+		MOVE.B	$2F(A1),D0	READ USART DATA REGISTER				*****
+		MOVEM.L	(A7)+,D1/A1	RESTORE REGISTERS					*****
+		RTS										*****
+												 ***
+CON_OUT		MOVEM.L	A1/D1-D2,-(A7)	BACK UP REGISTERS					*****
+		LEA	12(A0),A1	GET POINTER TO DEVICE FROM DCB				*****
+		MOVE.L	(A1),A1		PUT ADDRESS OF DEVICE IN A1				*****
+		CLR.B	19(A0)		CLEAR LOGICAL ERROR IN DCB				*****
+		BSET.B	#7,$1(A1)	NEGATE RTS TO INHIBIT RECEIVE				*****
+CON_O1		MOVE.B	$2D(A1),D1	READ TRANSMIT STATUS REGISTER				*****
+		BTST	#7,D1		CHECK TRANSMIT BUFFER FULL				*****
+		BNE.S	CON_O1		LOOP UNTIL TRANSMIT BUFFER EMPTY			*****
+		MOVE.B	D1,18(A0)	STORE STATUS REGISTER IN DCB				*****
+		MOVE.B	D0,$2F(A1)	PUT CHARACTER INTO USART DATA REGISTER			*****
+		MOVEM.L	(A7)+,A1/D1-D2	RESTORE WORKING REGISTERS				*****
+		RTS
+
 
 *****************************************************************************************************
 *****************************************************************************************************
 * DEVICE SECTION										*****
 												*****
 ****************************************							*****
-*  MC68901 INITIALIZATION									*****
+*  DEVICE CONTROL BLOCKS									*****
 												*****
+SET_DCB		MOVEM.L	A0-A3/D0-D3,-(A7)							*****
+		LEA	FIRST(A6),A0	POINTER TO FIRST DDB RAM DESTINATION			*****
+		LEA	DCB_LST(PC),A1	POINTER TO FIRST DCB ROM DECLARATION			*****
+		MOVE.W	#3,D0		4 DCB(s) TO SET UP (N-1)				*****
+SET_DCB1	MOVE.W	#15,D1		16 BYTE DCB HEADER					*****
+SET_DCB2	MOVE.B	(A1)+,(A0)+	MOVE BYTE FROM ROM TO RAM				*****
+		DBRA	D1,SET_DCB2	REPEAT FOR ENTIRE HEADER				*****
+		MOVE.W	(A1)+,D3	GET NUMBER OF BYTES IN PARAMETER BLOCK			*****
+		MOVE.W	D3,(A0)		STORE SIZE OF DCB IN RAM				*****
+		LEA	2(A0,D3.W),A0	A0 NOW POINTS TO END OF DCB IN RAM			*****
+		LEA	4(A0),A3	A3 POINTS TO ADDRESS OF NEXT DCB IN RAM			*****
+		MOVE.L	A3,(A0)		STORE POINTER TO NEXT DCB IN THIS ONE			*****
+		LEA	(A3),A0		A0 NOW POINTS TO NEXT DCB IN RAM			*****
+		DBRA	D0,SET_DCB1	REPEAT FOR ALL DCBs					*****
+		LEA	-4(A3),A3	A3 POINTS TO LAST DCB POINTER				*****
+		CLR.L	(A3)		LAST POINTER IS ZEROED FOR NULL TERMINATION		*****
+		MOVE.L	#DCB1,CONiVEC(A6)	SET VECTOR TO CONSOLE INPUT DCB			*****
+		MOVE.L	#DCB2,CONoVEC(A6)	SET VECTOR TO CONSOLE OUTPUT DCB		*****
+		MOVEM.L	(A7)+,A0-A3/D0-D3							*****
+		RTS										*****
+												*****
+DCB_LST		EQU	*									*****
+DCB1		DC.B	'CON_IN '	DEVICE NAME						*****
+		DC.L	CON_IN,MFPBAS	ADDRESS OF DRIVER ROUTINE, DEVICE			*****
+		DC.W	2		NUMBER OF PARAMETER WORDS				*****
+DCB2		DC.B	'CON_OUT '	DEVICE NAME						*****
+		DC.L	CON_OUT,MFPBAS	ADDRESS OF DRIVER ROUTINE, DEVICE			*****
+		DC.W	2		NUMBER OF PARAMETER WORDS				*****
+DCB3		DC.B	'BUF_IN '	DEVICE NAME						*****
+		DC.L	BUFF_IN,BUFFER	ADDRESS OF DRIVER ROUTINE, DEVICE			*****
+		DC.W	2		NUMBER OF PARAMETER WORDS				*****
+DCB4		DC.B	'BUF_OUT '	DEVICE NAME						*****
+		DC.L	BUFF_OUT,BUFFER	ADDRESS OF DRIVER ROUTINE, DEVICE			*****
+		DC.W	2		NUMBER OF PARAMETER WORDS				*****
+
+
+****************************************							*****
+*  MC68901 INITIALIZATION									*****
 												*****
 MFPINIT		EQU	*		MC68901 INITIALIZATION ROUTINE				*****
 		CLR.L	D0		CLEAR D0						*****
