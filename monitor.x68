@@ -115,8 +115,70 @@ START		EQU	ROMBAS									*****
 		DC.L	RESET		INITIAL PROGRAM COUNTER					*****
 RESET		EQU	*		COLD ENTRY POINT					*****
 		LEA	DATA,A6		POINT A6 TO DATA AREA					*****
-		CLR.L	UCOMTAB,A6	RESET USER COMMAND TABLE POINTER			*****
+		CLR.L	UCOMTAB(A6)	RESET USER COMMAND TABLE POINTER			*****
 		BSR.S	CFGUART		CONFIGURE UART						*****
+WARM		EQU	*
+		NOP
+		BRA	WARM
 
+*****************************************************************************************************
+*****************************************************************************************************
+* INITIALIZATION SECTION                                                                        *****
+                                                                                                *****
+CFGUART		EQU	*
+		RTS
 
-		
+*****************************************************************************************************
+*****************************************************************************************************
+* DEVICE SECTION										*****
+												*****
+****************************************							*****
+*  MC68901 INITIALIZATION									*****
+												*****
+												*****
+MFPINIT		EQU	*		MC68901 INITIALIZATION ROUTINE				*****
+		CLR.L	D0		CLEAR D0						*****
+		SUBQ	#1,D0		THEN TURN INTO ALL 1's					*****
+		MOVE.B	D0,MFPDDR	ALL MFP I/O INITIALIZED TO OUTPUT			*****
+		ADDQ	#2,D0		NOW TURN D0 INTO 1					*****
+		MOVE.B	D0,MFPTCDR	SELECT 1/2 TX CLOCK					*****
+		MOVE.B	D0,MFPTDDR	SEELCT 1/2 RX CLOCK					*****
+		MOVE.B	#$11,MFPTCDCR	SELECT DIVIDE BY 4 IN C/D CONTROL REGISTER		*****
+		MOVE.B	#$88,MFPUCR	SELECT DIVIDE BY 16, 8-BIT				*****
+*					NO PARITY IN USART CONTROL REGISTER			*****
+												*****
+*		INITIALIZE MFP VECTOR AND HANDLER						*****
+		MOVE.L	#MFPVCT,D0	GET VECTOR						*****
+		MOVE.B	D0,MFPVR	LOAD INTO MFP						*****
+		ASL.L	#2,D0		NOW SHIFT LEFT 2					*****
+		ADDI.L  #RAMBAS,D0								*****
+		MOVE.L	D0,A0		PUT INTO ADDRESS REGISTER				*****
+		MOVE.L	#MFPEXC,(A0)	AND INIT APPROPRIATE VECTOR				*****
+												*****
+*		START TX/RX CLOCKS								*****
+		MOVE.B	#1,MFPRSR	START RECEIVER CLOCK					*****
+		MOVE.B	#5,MFPTSR	START TRANSMIT CLOCK				     ***********
+		BSET.B	#7,MFPGPDR	RAISE RTS (INHIBIT RX)				      *********
+											       *******
+		RTS			DONE!  RETURN FROM ROUTINE				*****	
+												 ***
+												  *
+
+*****************************************************************************************************
+*****************************************************************************************************
+* EXCEPTION HANDLERS										*****
+												*****
+****************************************							*****
+*   Generic Exception Handler									*****
+												*****
+EXCHND		EQU	*		GENERIC EXCEPTION HANDLER				*****
+		RTE										*****
+												*****
+****************************************							*****
+*   MFP Exception Handler									*****
+											     ***********
+MFPEXC		EQU	*								      *********
+		RTE									       *******
+												*****
+												 *** 
+												  *												  
