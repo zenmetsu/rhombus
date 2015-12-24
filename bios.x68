@@ -431,7 +431,7 @@ printString	EQU	*									*****
 												**********************
 outChar		BSET.B  #7,MFPGPDR	Negate RTS to inhibit receiving				*****		****
 .outloop	BTST.B	#7,MFPTSR	Check for empty transmit buffer				*****		**
-		BNE.S	.outloop	Loop until ready					*****
+		BEQ.S	.outloop	Loop until ready					*****
 		MOVE.B	D0,MFPUDR	Put character into USART data register			*****
 		RTS			ELSE RETURN WHEN COMPLETED				*****
 										*********************
