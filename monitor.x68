@@ -141,9 +141,6 @@ CFGUART		EQU	*
 		BSR.W	MFPINIT
 		RTS
 
-NEWLINE		EQU	*
-		RTS
-
 LORAMINIT	EQU	*		THIS WILL TEST AND PREP LOWEST 2K OF RAM 		*****
 *	This routine performs a quick check of memory prior to					*****
 *	proceeding.  The count of errors is stored in D7 at completion				*****
@@ -217,7 +214,17 @@ TRAP0		EQU	*									*****
 		BSR	GETCHAR									*****
 		RTE										*****
 												 ***
-TRAP1		RTE										*****
+TRAP1		CMP.B	#1,D1		D1 =  1 = Print character				*****
+		BNE.S	TRAP2									*****
+		BSR	PUTCHAR									*****
+		RTE										*****
+												 ***
+TRAP2		CMP.B	#2,D1		D2 =  2 = Newline					*****
+		BNE.S	TRAP3									*****
+		BSR	NEWLINE									*****
+		RTE										*****
+												 ***
+TRAP3		RTE
 ER_BUS		RTE
 ER_ADDR		RTE
 ER_ILOP		RTE
@@ -318,9 +325,28 @@ OPEN3		EQU	*		NO MATCH, FIND ADDRESS OF NEXT DCB			*****
 		BNE	OPEN1		TRY NEXT DCB IF NOT AT END				*****
 		OR.B	#8,D7		ELSE FLAG ERROR AND BAIL				*****
 OPEN4		MOVEM.L	(A7)+,A1-A3/D0-D4							*****
-		RTS
-
-
+		RTS										*****
+												 ***
+NEWLINE		EQU	*		MOVE CURSOR TO BEGINNING OF NEW LINE			*****
+		MOVEM.L	A4,-(A7)	SAVE REGISTER						*****
+		LEA	CRLF(PC),A4	POINT TO CR/LF STRING					*****
+		BSR.S	PRINTSTRING	PRINT STRING						*****
+		MOVEM.L	(A7)+,A4	RESTORE REGISTER					*****
+		RTS										*****
+												 ***
+PRINTSTRING	EQU	*		DISPLAY STRING REFERENCED BY A4				*****
+		MOVE.L	D0,-(A7)	SAVE REGISTER						*****
+PRNT1		MOVE.B	(A4)+,D0	GET CHARACTER TO BE PRINTED				*****
+		BEQ.S	PRNT2		BAIL IF NULL TERMINATOR					*****
+		BSR	PUTCHAR		OTHERWISE PRINT						*****
+		BRA	PRNT1		LOOP UNTIL NULL TERMINATOR FOUND			*****
+PRNT2		MOVE.L	(A7)+,D0	RESTORE REGISTER					*****
+		RTS										*****
+												 ***
+HEADING		BSR	NEWLINE									*****
+		BSR	PRINTSTRING								*****
+		BRA	NEWLINE									*****
+												 ***
 *****************************************************************************************************
 *****************************************************************************************************
 * DEVICE SECTION										*****
@@ -412,4 +438,13 @@ MFPEXC		EQU	*								      *********
 		RTE									       *******
 												*****
 												 *** 
-												  *												  
+												  *
+
+*****************************************************************************************************
+*****************************************************************************************************
+* STRINGS AND FIXED PARAMETERS									*****
+												*****
+BANNER		DC.B	'RHOMBUS Monitor version 0.2015.12.25',0,0				*****
+CRLF		DC.B	CR,LF,'?',0								*****
+
+												  
