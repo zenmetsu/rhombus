@@ -37,11 +37,6 @@
 *   Defines											*****
 												*****
 NOP		EQU	$4E71		STANDARD 68000 NOP INSTRUCTION				*****
-MEMDAT		EQU	*		MEMORY EXERCISER DATA					*****	
-		DC.B	$5									*****
-		DC.B	$A									*****
-		DC.B	$0									*****
-		DC.B	$F									*****
 												*****
 ****************************************							*****
 *   Addresses											*****
@@ -123,6 +118,11 @@ CTRLA		EQU	$01									  *
 START		EQU	ROMBAS									*****
 		DC.L	STACK		INITIAL STACK POINTER					*****
 		DC.L	RESET		INITIAL PROGRAM COUNTER					*****
+MEMDAT		EQU	*		MEMORY EXERCISER DATA					*****	
+		DC.B	$5									*****
+		DC.B	$A									*****
+		DC.B	$0									*****
+		DC.B	$F									*****
 RESET		EQU	*		COLD ENTRY POINT					*****
 		LEA	DATA,A6		POINT A6 TO DATA AREA					*****
 		CLR.L	UCOMTAB(A6)	RESET USER COMMAND TABLE POINTER			*****
@@ -474,4 +474,4 @@ POR		DC.B	'<RESET>'								*****
 BANNER		DC.B	'RHOMBUS Monitor version 0.2015.12.25',0,0				*****
 CRLF		DC.B	CR,LF,'?',0								*****
 
-												  
+		END	START												  
