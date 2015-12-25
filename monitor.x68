@@ -151,7 +151,7 @@ memInit		EQU	*									*****
 		MOVE.L	D1,(A0,D0)	PUT HANDLER ADDRESS THERE				*****
 		SUBQ	#4,D0		AND DECREMENT POINTER					*****
 		BGE.S	.loop3		FILL REST OF MEMORY					*****
-* END RAM INITIALIZATINO		
+* END RAM INITIALIZATION		
 		LEA	RAMBAS,A6	POINT A6 TO DATA AREA					*****
 		CLR.L	UCOMTAB(A6)	RESET USER COMMAND TABLE POINTER			*****
 		BSR.S	CFGUART		CONFIGURE UART						*****
@@ -283,8 +283,8 @@ BUFF_OUT	LEA	12(A0),A1	A1 POINTS TO OUTPUT BUFFER				*****
 GETCHAR		MOVE.L	A0,-(A7)	BACK UP REGISTER					*****
 		MOVE.L	CONiVEC(A6),A0	A0 POINTS TO NAME OF CONSOLE DCB			*****
 		BSR.S	IO_OPEN		OPEN CONSOLE BY PLACING DCB ADDRESS IN A0		*****
-		BTST	#3,D7		THIS BIT SET IF OPEN ERROR				*****
-		BNE.S	GETCHAR3	BAIL IF ERROR						*****
+*		BTST	#3,D7		THIS BIT SET IF OPEN ERROR				*****
+*		BNE.S	GETCHAR3	BAIL IF ERROR						*****
 		BSR	IO_REQ		OTHERWISE DO I/O TRANSACTION				*****
 		AND.B	#$7F,D0		STRIP MSB OF INPUT					*****
 		TST.B	UCASE(A6)	TEST FOR UPPER -> LOWER CONVERSION			*****
@@ -363,8 +363,7 @@ PRNT1		MOVE.B	(A4)+,D0	GET CHARACTER TO BE PRINTED				*****
 PRNT2		MOVE.L	(A7)+,D0	RESTORE REGISTER					*****
 		RTS										*****
 												 ***
-HEADING		BSR	NEWLINE									*****
-		BSR	PRINTSTRING								*****
+HEADING		BSR	PRINTSTRING								*****
 		BRA	NEWLINE									*****
 												 ***
 												  *
@@ -490,7 +489,7 @@ msgEXTABinit	DC.B	'Initializing Exception Table...   ',0					*****
 msgDCBinit	DC.B	'Creating Device Control Blocks... ',0					*****
 
 BANNER		DC.B	'RHOMBUS Monitor version 0.2015.12.25.1',0,0				*****
-CRLF		DC.B	CR,LF,'?',0								*****
+CRLF		DC.B	CR,LF,'>',0								*****
 
 ****************************************							*****
 *   Environment Parameter Equates								*****
