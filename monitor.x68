@@ -109,9 +109,23 @@ RESET		EQU	*		COLD ENTRY POINT					*****
 		LEA	RAMBAS,A6	POINT A6 TO DATA AREA					*****
 		CLR.L	UCOMTAB(A6)	RESET USER COMMAND TABLE POINTER			*****
 		BSR.S	CFGUART		CONFIGURE UART						*****
+		LEA.L	msgPOR,A0	SEND POWER-ON-RESET MESSAGE
+		BSR.W	printString
+		LEA.L	msgLORAMck,A0	SEND LOW RAM CHECK MESSAGE
+		BSR.W	printString
 		BSR.S	LORAMINIT	INITIALIZE VBR AND STACK SPACE, LOWEST 2K OF RAM	*****
+		LEA.L	msgOK,A0								*****
+		BSR.W	printString								*****
+		LEA.L	msgEXTABinit,A0								*****
+		BSR.W	printString								*****
 		BSR	EXCSET		SET UP EXCEPTION TABLE					*****
+		LEA.L	msgOK,A0								*****
+		BSR.W	printString								*****
+		LEA.L	msgDCBinit,A0								*****
+		BSR.W	printString								*****
 		BSR	SET_DCB		SET UP DCB TABLE IN RAM					*****
+		LEA.L	msgOK,A0								*****
+		BSR.W	printString								*****
 		LEA	BANNER,A4	POINT TO BANNER						*****
 		BSR.W	HEADING		PRINT THE BANNER					*****
 WARM		CLR.L	D7		CLEAR ERROR FLAG					*****
@@ -355,6 +369,25 @@ HEADING		BSR	NEWLINE									*****
 		BSR	PRINTSTRING								*****
 		BRA	NEWLINE									*****
 												 ***
+												  *
+****************************************							*************************
+* MFP Transmit/Receive										*************************	
+												*************************
+printString	EQU	*									*****
+.loop		MOVE.B	(A0)+,D0	Read character data					*****	
+		BEQ.S	.printEnd	Check for null terminator				*****		**
+		BSR.S	outChar		Write the character					*****		****
+		BRA.S	.loop		Loop until null found					**********************
+.printEnd	RTS										************************
+												**********************
+outChar		BSET.B  #7,MFPGPDR	Negate RTS to inhibit receiving				*****		****
+.outloop	BTST.B	#7,MFPTSR	Check for empty transmit buffer				*****		**
+		BEQ.S	.outloop	Loop until ready					*****
+		MOVE.B	D0,MFPUDR	Put character into USART data register			*****
+		RTS			ELSE RETURN WHEN COMPLETED				*****
+										*********************
+										*********************
+										*********************
 *****************************************************************************************************
 *****************************************************************************************************
 * DEVICE SECTION										*****
@@ -424,7 +457,7 @@ MFPINIT		EQU	*		MC68901 INITIALIZATION ROUTINE				*****
 		MOVE.B	#1,MFPRSR	START RECEIVER CLOCK					*****
 		MOVE.B	#5,MFPTSR	START TRANSMIT CLOCK				     ***********
 		BSET.B	#7,MFPGPDR	RAISE RTS (INHIBIT RX)				      *********
-		MOVE.B	#'>',MFPUDR							       *******
+											       *******
 		RTS			DONE!  RETURN FROM ROUTINE				*****	
 												 ***
 												  *
@@ -452,7 +485,12 @@ MFPEXC		EQU	*								      *********
 *****************************************************************************************************
 * STRINGS AND FIXED PARAMETERS									*****
 												*****
-POR		DC.B	'<RESET>'								*****
+msgPOR		DC.B	'<RESET>',CR,LF,0
+msgLORAMck	DC.B	'Checking low memory...            ',0					*****
+msgOK		DC.B	'OK',CR,LF,0
+msgEXTABinit	DC.B	'Initializing Exception Table...   ',0					*****
+msgDCBinit	DC.B	'Creating Device Control Blocks... ',0					*****
+
 BANNER		DC.B	'RHOMBUS Monitor version 0.2015.12.25.1',0,0				*****
 CRLF		DC.B	CR,LF,'?',0								*****
 
