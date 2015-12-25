@@ -50,7 +50,7 @@ ROMBAS		EQU	0		ROM BASE ADDRESS					*****
 RAMBAS		EQU	$F00000		RAM BASE ADDRESS					*****
 MFPBAS		EQU	$EF0000		MFP BASE ADDRESS					*****
 MFPVCT		EQU	$40		VECTOR FOR MFP SOURCED INTERRUPT			*****
-STACK		EQU	$F0800									*****
+STACK		EQU	$F00800									*****
 												*****
 ****************************************							*****
 *   MC68901 MFP Registers									*****
@@ -84,7 +84,7 @@ MFPUDR		EQU     MFPBAS+$2F	USART DATA REGISTER					*****
 *   Environment Parameter Equates								*****
 												*****
 MAXCHR		EQU	64		MAXIMUM LENGTH OF COMMAND LINE				*****
-DATA		EQU	$F0800		DATA ORIGIN						*****
+DATA		EQU	$F00800		DATA ORIGIN						*****
 LNBUF		DS.B	MAXCHR		COMMAND LINE BUFFER					*****
 BUFEND		EQU	LNBUF+MAXCHR-1	END OF COMMAND LINE POINTER				*****
 BUFPT		DS.L	1		COMMAND LINE POINTER					*****
@@ -470,6 +470,7 @@ MFPEXC		EQU	*								      *********
 *****************************************************************************************************
 * STRINGS AND FIXED PARAMETERS									*****
 												*****
+POR		DC.B	'<RESET>'								*****
 BANNER		DC.B	'RHOMBUS Monitor version 0.2015.12.25',0,0				*****
 CRLF		DC.B	CR,LF,'?',0								*****
 
