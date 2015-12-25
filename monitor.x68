@@ -424,7 +424,7 @@ MFPINIT		EQU	*		MC68901 INITIALIZATION ROUTINE				*****
 		MOVE.B	#1,MFPRSR	START RECEIVER CLOCK					*****
 		MOVE.B	#5,MFPTSR	START TRANSMIT CLOCK				     ***********
 		BSET.B	#7,MFPGPDR	RAISE RTS (INHIBIT RX)				      *********
-											       *******
+		MOVE.B	#'>',MFPUDR							       *******
 		RTS			DONE!  RETURN FROM ROUTINE				*****	
 												 ***
 												  *
