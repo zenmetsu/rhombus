@@ -106,42 +106,6 @@ MEMDAT		EQU	*		MEMORY EXERCISER DATA					*****
 		DC.B	$F
 		DS.L	$100									*****
 RESET		EQU	*		COLD ENTRY POINT					*****
-		LEA	RAMBAS,A6	POINT A6 TO DATA AREA					*****
-		BSR.S	LORAMINIT	INITIALIZE VBR AND STACK SPACE, LOWEST 2K OF RAM	*****
-		CLR.L	UCOMTAB(A6)	RESET USER COMMAND TABLE POINTER			*****
-		BSR.S	CFGUART		CONFIGURE UART						*****
-		LEA.L	msgPOR,A0	SEND POWER-ON-RESET MESSAGE
-		BSR.W	printString
-		LEA.L	msgLORAMck,A0	SEND LOW RAM CHECK MESSAGE
-		BSR.W	printString
-		LEA.L	msgOK,A0								*****
-		BSR.W	printString								*****
-		LEA.L	msgEXTABinit,A0								*****
-		BSR.W	printString								*****
-		BSR	EXCSET		SET UP EXCEPTION TABLE					*****
-		LEA.L	msgOK,A0								*****
-		BSR.W	printString								*****
-		LEA.L	msgDCBinit,A0								*****
-		BSR.W	printString								*****
-		BSR	SET_DCB		SET UP DCB TABLE IN RAM					*****
-		LEA.L	msgOK,A0								*****
-		BSR.W	printString								*****
-		LEA	BANNER,A4	POINT TO BANNER						*****
-		BSR.W	HEADING		PRINT THE BANNER					*****
-WARM		CLR.L	D7		CLEAR ERROR FLAG					*****
-		BSR.W	NEWLINE		PRINT A NEWLINE						*****
-		BSR.W	GETLINE		GET A COMMAND LINE					*****
-		NOP
-		BRA	WARM
-
-*****************************************************************************************************
-*****************************************************************************************************
-* INITIALIZATION SECTION                                                                        *****
-                                                                                                *****
-CFGUART		EQU	*
-		BSR.W	MFPINIT
-		RTS
-
 LORAMINIT	EQU	*		THIS WILL TEST AND PREP LOWEST 2K OF RAM 		*****
 *	This routine performs a quick check of memory prior to					*****
 *	proceeding.  The count of errors is stored in D7 at completion				*****
@@ -187,8 +151,42 @@ memInit		EQU	*									*****
 		MOVE.L	D1,(A0,D0)	PUT HANDLER ADDRESS THERE				*****
 		SUBQ	#4,D0		AND DECREMENT POINTER					*****
 		BGE.S	.loop3		FILL REST OF MEMORY					*****
-		RTS										*****		
-		
+* END RAM INITIALIZATINO		
+		LEA	RAMBAS,A6	POINT A6 TO DATA AREA					*****
+		CLR.L	UCOMTAB(A6)	RESET USER COMMAND TABLE POINTER			*****
+		BSR.S	CFGUART		CONFIGURE UART						*****
+		LEA.L	msgPOR,A0	SEND POWER-ON-RESET MESSAGE
+		BSR.W	printString
+		LEA.L	msgLORAMck,A0	SEND LOW RAM CHECK MESSAGE
+		BSR.W	printString
+		LEA.L	msgOK,A0								*****
+		BSR.W	printString								*****
+		LEA.L	msgEXTABinit,A0								*****
+		BSR.W	printString								*****
+		BSR	EXCSET		SET UP EXCEPTION TABLE					*****
+		LEA.L	msgOK,A0								*****
+		BSR.W	printString								*****
+		LEA.L	msgDCBinit,A0								*****
+		BSR.W	printString								*****
+		BSR	SET_DCB		SET UP DCB TABLE IN RAM					*****
+		LEA.L	msgOK,A0								*****
+		BSR.W	printString								*****
+		LEA	BANNER,A4	POINT TO BANNER						*****
+		BSR.W	HEADING		PRINT THE BANNER					*****
+WARM		CLR.L	D7		CLEAR ERROR FLAG					*****
+		BSR.W	NEWLINE		PRINT A NEWLINE						*****
+		BSR.W	GETLINE		GET A COMMAND LINE					*****
+		NOP
+		BRA	WARM
+
+*****************************************************************************************************
+*****************************************************************************************************
+* INITIALIZATION SECTION                                                                        *****
+                                                                                                *****
+CFGUART		EQU	*
+		BSR.W	MFPINIT
+		RTS
+
 
 EXCSET		EQU	*		SET UP EXCEPTION TABLE
 		MOVE.L	#RAMBAS,D0	POINT TO BASE OF RAM					*****
