@@ -453,7 +453,7 @@ MFPEXC		EQU	*								      *********
 * STRINGS AND FIXED PARAMETERS									*****
 												*****
 POR		DC.B	'<RESET>'								*****
-BANNER		DC.B	'RHOMBUS Monitor version 0.2015.12.25',0,0				*****
+BANNER		DC.B	'RHOMBUS Monitor version 0.2015.12.25.1',0,0				*****
 CRLF		DC.B	CR,LF,'?',0								*****
 
 ****************************************							*****
