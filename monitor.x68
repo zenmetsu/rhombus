@@ -75,25 +75,6 @@ MFPRSR		EQU     MFPBAS+$2B	RECEIVER STATUS REGISTER				*****
 MFPTSR		EQU     MFPBAS+$2D	TRANSMITTER STATUS REGISTER				*****
 MFPUDR		EQU     MFPBAS+$2F	USART DATA REGISTER					*****
 												*****	
-****************************************							*****
-*   Environment Parameter Equates								*****
-												*****
-MAXCHR		EQU	64		MAXIMUM LENGTH OF COMMAND LINE				*****
-DATA		EQU	$F00800		DATA ORIGIN						*****
-LNBUF		DS.B	MAXCHR		COMMAND LINE BUFFER					*****
-BUFEND		EQU	LNBUF+MAXCHR-1	END OF COMMAND LINE POINTER				*****
-BUFPT		DS.L	1		COMMAND LINE POINTER					*****
-PARAM		DS.L	1		LAST COMMAND LINE PARAMETER				*****
-ECHO		DS.B	1		LOCAL ECHO ON CLEAR					*****
-UCASE		DS.B	1		UPPER CASE CONVERSION FLAG				*****
-UCOMTAB		DS.L	1		USER COMMAND TABLE POINTER				*****
-CONiVEC		DS.L	1		CONSOLE INPUT DCB POINTER				*****
-CONoVEC		DS.L	1		CONSOLE OUTPUT DCB POINTER				*****
-TSK_T		DS.W	37		FRAME: D0-D7/A0-A6/USB/SSP/SW/PC			*****
-BKPTAB		DS.W	24		BREAKPOINT TABLE					*****
-FIRST		DS.B	512		DCB AREA						*****
-BUFFER		DS.B	256		256 BYTE I/O BUFFER					*****
-												*****
 												*****
 ****************************************							*****
 *   ASCII Equates										*****
@@ -114,15 +95,16 @@ CTRLA		EQU	$01									  *
 *	Program section										*****
 *	The ROM in this BIOS is mapped to the variable						*****
 *	ROMBAS.  All executable code is resident in ROM.					*****
-												*****
 START		EQU	ROMBAS									*****
 		DC.L	STACK		INITIAL STACK POINTER					*****
 		DC.L	RESET		INITIAL PROGRAM COUNTER					*****
+ROMBUF		DS.L	32
 MEMDAT		EQU	*		MEMORY EXERCISER DATA					*****	
 		DC.B	$5									*****
 		DC.B	$A									*****
 		DC.B	$0									*****
-		DC.B	$F									*****
+		DC.B	$F
+		DS.L	$100									*****
 RESET		EQU	*		COLD ENTRY POINT					*****
 		LEA	DATA,A6		POINT A6 TO DATA AREA					*****
 		CLR.L	UCOMTAB(A6)	RESET USER COMMAND TABLE POINTER			*****
@@ -473,5 +455,25 @@ MFPEXC		EQU	*								      *********
 POR		DC.B	'<RESET>'								*****
 BANNER		DC.B	'RHOMBUS Monitor version 0.2015.12.25',0,0				*****
 CRLF		DC.B	CR,LF,'?',0								*****
+
+****************************************							*****
+*   Environment Parameter Equates								*****
+												*****
+MAXCHR		EQU	64		MAXIMUM LENGTH OF COMMAND LINE				*****
+DATA		EQU	$F00800		DATA ORIGIN						*****
+LNBUF		DS.B	MAXCHR		COMMAND LINE BUFFER					*****
+BUFEND		EQU	LNBUF+MAXCHR-1	END OF COMMAND LINE POINTER				*****
+BUFPT		DS.L	1		COMMAND LINE POINTER					*****
+PARAM		DS.L	1		LAST COMMAND LINE PARAMETER				*****
+ECHO		DS.B	1		LOCAL ECHO ON CLEAR					*****
+UCASE		DS.B	1		UPPER CASE CONVERSION FLAG				*****
+UCOMTAB		DS.L	1		USER COMMAND TABLE POINTER				*****
+CONiVEC		DS.L	1		CONSOLE INPUT DCB POINTER				*****
+CONoVEC		DS.L	1		CONSOLE OUTPUT DCB POINTER				*****
+TSK_T		DS.W	37		FRAME: D0-D7/A0-A6/USB/SSP/SW/PC			*****
+BKPTAB		DS.W	24		BREAKPOINT TABLE					*****
+FIRST		DS.B	512		DCB AREA						*****
+BUFFER		DS.B	256		256 BYTE I/O BUFFER					*****
+												*****
 
 		END	START												  
