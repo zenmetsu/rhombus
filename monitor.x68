@@ -177,9 +177,11 @@ memInit		EQU	*									*****
 WARM		CLR.L	D7		CLEAR ERROR FLAG					*****
 		BSR.W	NEWLINE		PRINT A NEWLINE						*****
 		BSR.W	GETLINE		GET A COMMAND LINE					*****
-		NOP
-		BRA	WARM
-
+		BSR.W	TIDY		CLEAN UP COMMAND LINE BUFFER				*****
+		BSR.W	EXECUTE		INTERPRET AND EXECUTE COMMAND				*****
+		BRA	WARM									*****
+												 ***
+												  *
 *****************************************************************************************************
 *****************************************************************************************************
 * INITIALIZATION SECTION                                                                        *****
@@ -365,7 +367,7 @@ GLN4		CMP.L	A2,A3		TEST FOR BUFFER OVERFLOW				*****
 		BNE	GLN2		IF NOT FULL, GET NEW CHARACTER				*****
 GLN5		BSR	NEWLINE		ELSE MOVE TO NEXT LINE					*****
 		BRA	GETLINE		AND REPEAT						*****
-
+												 ***
 PRINTSTRING	EQU	*		DISPLAY STRING REFERENCED BY A4				*****
 		MOVE.L	D0,-(A7)	SAVE REGISTER						*****
 PRNT1		MOVE.B	(A4)+,D0	GET CHARACTER TO BE PRINTED				*****
@@ -377,6 +379,31 @@ PRNT2		MOVE.L	(A7)+,D0	RESTORE REGISTER					*****
 												 ***
 HEADING		BSR	PRINTSTRING								*****
 		BRA	NEWLINE									*****
+												 ***
+TIDY		LEA	LNBUF(A6),A0	POINT A0 TO LINE BUFFER					*****
+		LEA	(A0),A1		POINT A1 TO START OF LINE BUFFER			*****
+TIDY1		MOVE.B	(A0)+,D0	READ A CHARACTER INTO D0				*****
+		CMP.B	#SPACE,D0	CHECK FOR LEADING WHITESPACE				*****
+		BEQ.S	TIDY1		LOOP UNTIL NON-WHITESPACE CHARACTER FOUND		*****
+		LEA	-1(A0),A0	MOVE POINTER BACK TO FIRST CHARACTER			*****
+TIDY2		MOVE.B	(A0)+,D0	MOVE STRING LEFT TO REMOVE LEADING SPACES		*****
+		MOVE.B	D0,(A1)+								*****
+		CMP.B	#SPACE,D0	CHECK FOR MID-LINE SPACE				*****
+		BNE.S	TIDY4		CHECK FOR CR IF NOT					*****
+TIDY3		CMP.B	#SPACE,(A0)+	SKIP OVER CONSEQUTIVE MID-LINE SPACES			*****
+		BEQ.S	TIDY3									*****
+		LEA	-1(A0),A0	MOVE POINTER BACK					*****
+TIDY4		CMP.B	#CR,D0		TEST FOR CR						*****
+		BNE.S	TIDY2		IF NO MATCH, READ NEXT CHARACTER			*****
+		LEA	LNBUF(A6),A0	RESTORE BUFFER POINTER					*****
+TIDY5		CMP.B	#CR,(A0)	TEST FOR CR						*****
+		BEQ.S	TIDY6		BAIL IF CR MATCHED					*****
+		CMP.B	#SPACE,(A0)+	TEST FOR COMMAND DELIMITER				*****
+		BNE.S	TIDY5		REPEAT UNTIL DELIMITER OR CR MATCHED			*****
+TIDY6		MOVE.L	A0,BUFPT(A6)	UPDATE BUFFER POINTER					*****
+		RTS										*****
+												 ***
+EXECUTE		RTS										*****
 												 ***
 												  *
 ****************************************							*************************
@@ -500,7 +527,7 @@ msgOK		DC.B	'OK',CR,LF,0
 msgEXTABinit	DC.B	'Initializing Exception Table...   ',0					*****
 msgDCBinit	DC.B	'Creating Device Control Blocks... ',0					*****
 
-BANNER		DC.B	'RHOMBUS Monitor version 0.2015.12.25.1',0,0				*****
+BANNER		DC.B	'RHOMBUS Monitor version 0.2015.12.26.0',0,0				*****
 CRLF		DC.B	CR,LF,'>',0								*****
 
 ****************************************							*****
