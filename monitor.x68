@@ -468,13 +468,13 @@ EXECUTE		TST.L	UCOMTAB(A6)	Test pointer to user table				*****
 		MOVE.L	(A3),A3		Else get absolute address of command			*****
 		JMP	(A3)		from user table and execute it				*****
 												*****
-EXEC1		LEA.L	COMTAB(PC),A3	Try built-in command table				*****
+EXEC1		LEA.L	COMTAB,A3	Try built-in command table				*****
 		BSR.S	SEARCH		Look for command in built-in table			*****
 		BCS.S	EXEC2		If found then execute command				*****
-		LEA.L	ERMES2(PC),A4	Else print "invalid command"				*****
+		LEA.L	ERMES2,A4	Else print "invalid command"				*****
 		BRA.L	PRINTSTRING	and return						*****
 EXEC2		MOVE.L	(A3),A3		Get the relative command address			*****
-		LEA.L	COMTAB(PC),A4	pointed at by A3 and add it to				*****
+		LEA.L	COMTAB,A4	pointed at by A3 and add it to				*****
 		ADD.L	A4,A3		the PC to generate the actual				*****
 		JMP	(A3)		command address. Then execute it.			*****
 												 ***
