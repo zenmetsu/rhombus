@@ -668,7 +668,7 @@ msgOK		DC.B	'OK',CR,LF,0
 msgEXTABinit	DC.B	'Initializing Exception Table...   ',0					*****
 msgDCBinit	DC.B	'Creating Device Control Blocks... ',0					*****
 
-BANNER		DC.B	'RHOMBUS Monitor version 0.2015.12.26.0',0,0				*****
+BANNER		DC.B	'RHOMBUS Monitor version 0.2015.12.27.0',0,0				*****
 CRLF		DC.B	CR,LF,'>',0								*****
 HEADER		DC.B	CR,LF,'S','1',0,0
 TAIL		DC.B	'S9  ',0,0
