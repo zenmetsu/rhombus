@@ -402,6 +402,32 @@ TIDY5		CMP.B	#CR,(A0)	TEST FOR CR						*****
 		BNE.S	TIDY5		REPEAT UNTIL DELIMITER OR CR MATCHED			*****
 TIDY6		MOVE.L	A0,BUFPT(A6)	UPDATE BUFFER POINTER					*****
 		RTS										*****
+
+PARAM    MOVE.L   D1,-(A7)          Save D1
+         CLR.L    D1                Clear input accumulator
+         MOVE.L   BUFPT(A6),A0     A0 points to parameter in buffer
+PARAM1   MOVE.B   (A0)+,D0          Read character from line buffer
+         CMP.B    #SPACE,D0         Test for delimiter
+         BEQ.S    PARAM4            The permitted delimiter is a
+         CMP.B    #CR,D0            space or a carriage return
+         BEQ.S    PARAM4            Exit on either space or C/R
+         ASL.L    #4,D1             Shift accumulated result 4 bits left
+         SUB.B    #$30,D0           Convert new character to hex
+         BMI.S    PARAM5            If less than $30 then not-hex
+         CMP.B    #$09,D0           If less than 10
+         BLE.S    PARAM3            then continue
+         SUB.B    #$07,D0           Else assume $A - $F
+         CMP.B    #$0F,D0           If more than $F
+         BGT.S    PARAM5            then exit to error on not-hex
+PARAM3   ADD.B    D0,D1             Add latest nybble to total in D1
+         BRA      PARAM1            Repeat until delimiter found
+PARAM4   MOVE.L   A0,BUFPT(A6)     Save pointer in memory
+	MOVE.L	D1,PARAMETER(A6)	Save parameter in memory
+         MOVE.L   D1,D0             Put parameter in D0 for return
+         BRA.S    PARAM6            Return without error
+PARAM5   OR.B     #2,D7             Set error flag before return
+PARAM6   MOVE.L   (A7)+,D1          Restore working register
+         RTS                        Return with error
 												 ***
 HEX      BSR      GETCHAR           Get a character from input device
          SUB.B    #$30,D0           Convert to binary
@@ -707,7 +733,7 @@ DATA		EQU	$00000C00	DATA ORIGIN						*****
 LNBUF		DS.B	MAXCHR		COMMAND LINE BUFFER					*****
 BUFEND		EQU	LNBUF+MAXCHR-1	END OF COMMAND LINE POINTER				*****
 BUFPT		DS.L	1		COMMAND LINE POINTER					*****
-PARAM		DS.L	1		LAST COMMAND LINE PARAMETER				*****
+PARAMETER	DS.L	1		LAST COMMAND LINE PARAMETER				*****
 ECHO		DS.B	1		LOCAL ECHO ON CLEAR					*****
 UCASE		DS.B	1		UPPER CASE CONVERSION FLAG				*****
 UCOMTAB		DS.L	1		USER COMMAND TABLE POINTER				*****
