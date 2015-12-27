@@ -403,7 +403,147 @@ TIDY5		CMP.B	#CR,(A0)	TEST FOR CR						*****
 TIDY6		MOVE.L	A0,BUFPT(A6)	UPDATE BUFFER POINTER					*****
 		RTS										*****
 												 ***
-EXECUTE		RTS										*****
+HEX      BSR      GETCHAR           Get a character from input device
+         SUB.B    #$30,D0           Convert to binary
+         BMI.S    NOT_HEX           If less than $30 then exit with error
+         CMP.B    #$09,D0           Else test for number (0 to 9)
+         BLE.S    HEX_OK            If number then exit - success
+         SUB.B    #$07,D0           Else convert letter to hex
+         CMP.B    #$0F,D0           If character in range "A" to "F"
+         BLE.S    HEX_OK            then exit successfully
+NOT_HEX  OR.B     #1,D7             Else set error flag
+HEX_OK   RTS                        and return
+
+BYTE     MOVE.L   D1,-(A7)          Save D1
+         BSR      HEX               Get first hex character
+         ASL.B    #4,D0             Move it to MS nybble position
+         MOVE.B   D0,D1             Save MS nybble in D1
+         BSR      HEX               Get second hex character
+         ADD.B    D1,D0             Merge MS and LS nybbles
+         MOVE.L   (A7)+,D1          Restore D1
+         RTS
+
+WORD     BSR      BYTE              Get upper order byte
+         ASL.W    #8,D0             Move it to MS position
+         BRA      BYTE              Get LS byte and return
+
+LONGWD   BSR      WORD              Get upper order word
+         SWAP     D0                Move it to MS position
+         BRA      WORD              Get lower order word and return
+
+OUT1X    MOVE.W   D0,-(A7)          Save D0
+         AND.B    #$0F,D0           Mask off MS nybble
+         ADD.B    #$30,D0           Convert to ASCII
+         CMP.B    #$39,D0           ASCII = HEX + $30
+         BLS.S    OUT1X1            If ASCII <= $39 then print and exit
+         ADD.B    #$07,D0           Else ASCII := HEX + 7
+OUT1X1   BSR      PUTCHAR           Print the character
+         MOVE.W   (A7)+,D0          Restore D0
+         RTS
+
+OUT2X    ROR.B    #4,D0             Get MS nybble in LS position
+         BSR      OUT1X             Print MS nybble
+         ROL.B    #4,D0             Restore LS nybble
+         BRA      OUT1X             Print LS nybble and return
+
+OUT4X    ROR.W    #8,D0             Get MS byte in LS position
+         BSR      OUT2X             Print MS byte
+         ROL.W    #8,D0             Restore LS byte
+         BRA      OUT2X             Print LS byte and return
+
+OUT8X    SWAP     D0                Get MS word in LS position
+         BSR      OUT4X             Print MS word
+         SWAP     D0                Restore LS word
+         BRA      OUT4X             Print LS word and return
+												  *
+*****************************************************************************************************
+*****************************************************************************************************
+* COMMAND SUBROUTINES SECTION									*****
+												*****
+EXECUTE		TST.L	UCOMTAB(A6)	Test pointer to user table				*****
+		BEQ.S	EXEC1		If clear then try built-in table			*****
+		MOVE.L	UCOMTAB(A6),A3	Else pick up pointer to user table			*****
+		BSR.S	SEARCH		Look for command in user table				*****
+		BCC.S	EXEC1		If not found then try internal table			*****
+		MOVE.L	(A3),A3		Else get absolute address of command			*****
+		JMP	(A3)		from user table and execute it				*****
+												*****
+EXEC1		LEA.L	COMTAB(PC),A3	Try built-in command table				*****
+		BSR.S	SEARCH		Look for command in built-in table			*****
+		BCS.S	EXEC2		If found then execute command				*****
+		LEA.L	ERMES2(PC),A4	Else print "invalid command"				*****
+		BRA.L	PRINTSTRING	and return						*****
+EXEC2		MOVE.L	(A3),A3		Get the relative command address			*****
+		LEA.L	COMTAB(PC),A4	pointed at by A3 and add it to				*****
+		ADD.L	A4,A3		the PC to generate the actual				*****
+		JMP	(A3)		command address. Then execute it.			*****
+												 ***
+SEARCH		EQU	*                 Match the command in the line buffer			*****
+		CLR.L	D0                with command table pointed at by A3			*****
+		MOVE.B	(A3),D0           Get the first character in the			*****
+		BEQ.S	SRCH7             current entry. If zero then exit			*****
+		LEA.L	6(A3,D0.W),A4     Else calculate address of next entry			*****
+		MOVE.B	1(A3),D1          Get number of characters to match			*****
+		LEA.L	LNBUF(A6),A5     A5 points to command in line buffer			*****
+		MOVE.B	2(A3),D2          Get first character in this entry			*****
+		CMP.B	(A5)+,D2          from the table and match with buffer			*****
+		BEQ.S	SRCH3             If match then try rest of string			*****
+SRCH2		MOVE.L	A4,A3             Else get address of next entry			*****
+		BRA	SEARCH            and try the next entry in the table			*****
+SRCH3		SUB.B	#1,D1             One less character to match				*****
+		BEQ.S	SRCH6             If match counter zero then all done			*****
+		LEA.L	3(A3),A3          Else point to next character in table			*****
+SRCH4		MOVE.B	(A3)+,D2          Now match a pair of characters			*****
+		CMP.B	(A5)+,D2								*****
+		BNE	SRCH2             If no match then try next entry			*****
+		SUB.B	#1,D1             Else decrement match counter and			*****
+		BNE	SRCH4             repeat until no chars left to match			*****
+SRCH6		LEA.L	-4(A4),A3         Calculate address of command entry			*****
+		OR.B	#1,CCR            point. Mark carry flag as success			*****
+		RTS			and return						*****
+SRCH7		AND.B	#$FE,CCR	Fail - clear carry to indicate				*****
+		RTS			command not found and return				*****
+												 ***
+MEMORY   BSR      PARAM             Get start address from line buffer
+         TST.B    D7                Test for input error
+         BNE.S    MEM3              If error then exit
+         MOVE.L   D0,A3             A3 points to location to be opened
+MEM1     BSR      NEWLINE
+         BSR.S    ADR_DAT           Print current address and contents
+         BSR.S    PSPACE             update pointer, A3, and O/P space
+         BSR      GETCHAR           Input char to decide next action
+         CMP.B    #CR,D0            If carriage return then exit
+         BEQ.S    MEM3              Exit
+         CMP.B    #'-',D0           If "-" then move back
+         BNE.S    MEM2              Else skip wind-back procedure
+         LEA.L    -4(A3),A3         Move pointer back 2+2
+         BRA      MEM1              Repeat until carriage return
+MEM2     CMP.B    #SPACE,D0         Test for space (= new entry)
+         BNE.S    MEM1              If not space then repeat
+         BSR      WORD              Else get new word to store
+         TST.B    D7                Test for input error
+         BNE.S    MEM3              If error then exit
+         MOVE.W   D0,-2(A3)         Store new word
+         BRA      MEM1              Repeat until carriage return
+MEM3     RTS
+
+ADR_DAT  MOVE.L   D0,-(A7)          Print the contents of A3 and the
+         MOVE.L   A3,D0             word pointed at by A3.
+         BSR      OUT8X              and print current address
+         BSR.S    PSPACE            Insert delimiter
+         MOVE.W   (A3),D0           Get data at this address in D0
+         BSR      OUT4X              and print it
+         LEA.L    2(A3),A3          Point to next address to display
+         MOVE.L   (A7)+,D0          Restore D0
+         RTS
+*
+PSPACE   MOVE.B   D0,-(A7)          Print a single space
+         MOVE.B   #SPACE,D0
+         BSR      PUTCHAR
+         MOVE.B   (A7)+,D0
+         RTS
+
+ 
 												 ***
 												  *
 ****************************************							*************************
@@ -424,6 +564,7 @@ outChar		BSET.B  #7,MFPGPDR	Negate RTS to inhibit receiving				*****		****
 										*********************
 										*********************
 										*********************
+
 *****************************************************************************************************
 *****************************************************************************************************
 * DEVICE SECTION										*****
@@ -529,12 +670,39 @@ msgDCBinit	DC.B	'Creating Device Control Blocks... ',0					*****
 
 BANNER		DC.B	'RHOMBUS Monitor version 0.2015.12.26.0',0,0				*****
 CRLF		DC.B	CR,LF,'>',0								*****
+HEADER		DC.B	CR,LF,'S','1',0,0
+TAIL		DC.B	'S9  ',0,0
+MES1		DC.B	' SR  =  ',0
+MES2		DC.B	' PC  =  ',0
+MES2A		DC.B	' SS  =  ',0
+MES3		DC.B	'  Data reg       Address reg',0,0
+MES4		DC.B	'        ',0,0
+MES8		DC.B	'Bus error   ',0,0
+MES9		DC.B	'Address error   ',0,0
+MES10		DC.B	'Illegal instruction ',0,0
+MES11		DC.B	'Breakpoint  ',0,0
+MES12		DC.B	'Trace   ',0
+REGNAME		DC.B	'D0D1D2D3D4D5D6D7'
+		DC.B	'A0A1A2A3A4A5A6A7'
+		DC.B	'SSSR'
+		DC.B	'PC  ',0
+ERMES1		DC.B	'Non-valid hexadecimal input  ',0
+ERMES2		DC.B	'Invalid command  ',0
+ERMES3		DC.B	'Loading error',0
+ERMES4		DC.B	'Table full  ',0,0
+ERMES5		DC.B	'Breakpoint not active   ',0,0
+ERMES6		DC.B	'Uninitialized exception ',0,0
+ERMES7		DC.B	' Range error',0
 
+COMTAB		DC.B	8,3		MEMORY <address> examines contents of
+		DC.B	'MEMORY  '	<address> and allows them to be changed
+		DC.L	MEMORY-COMTAB
+		DC.B	0,0		TERMINATE COMMAND TABLE
 ****************************************							*****
 *   Environment Parameter Equates								*****
 												*****
 MAXCHR		EQU	64		MAXIMUM LENGTH OF COMMAND LINE				*****
-		ORG	$C00
+		ORG	$F00
 DATA		EQU	$00000C00	DATA ORIGIN						*****
 LNBUF		DS.B	MAXCHR		COMMAND LINE BUFFER					*****
 BUFEND		EQU	LNBUF+MAXCHR-1	END OF COMMAND LINE POINTER				*****
