@@ -431,9 +431,10 @@ PARAM5   OR.B     #2,D7             Set error flag before return
 PARAM6   MOVE.L   (A7)+,D1          Restore working register
 	RTS			Return with error						*****
 												 ***
-PARNUM	MOVE.L	D1,-(A7)		Save D1							*****
-	MOVE.L	BUFPT(A6),A0		A0 points to parameter in buffer			*****
-PARNUM0	CLR.L	D1			Clear input accumulator					*****
+PARNUM	MOVE.L	BUFPT(A6),A0		A0 points to parameter in buffer			*****
+PARNUM0	MOVE.L	D1,-(A7)		Save D1							*****
+	CLR.L	D1			Clear input accumulator					*****
+	CLR.L	D7			Clear error flags					*****
 PARNUM1	MOVE.B	(A0)+,D0		Read character from the line buffer			*****
 	CMP.B	#SPACE,D0		Ignore leading spaces					*****
 	BEQ.S	PARNUM1			Grab another character until non-space found		*****
@@ -579,7 +580,8 @@ dispRAM		MOVEM.L	D2-D4/A2,-(SP)	Save registers						************************
 		RTS										************************	
 										**************************************
 										*********************		****
-										*********************		**												  *
+										*********************		**
+
 *****************************************************************************************************
 *****************************************************************************************************
 * COMMAND SUBROUTINES SECTION									*****
@@ -705,13 +707,13 @@ EXLOOP		MOVE.B	(A0)+,D0	Grab next character in command buffer			*****
 		MOVE.L	#1,D0		Otherwise read a single byte				*****
 		BRA.S	EXEND									*****
 EXRANGE		BSR.W	PARNUM0		Find ending address					*****
-		TST.B	D7		Non-zero retorn on invalid address			*****
+		TST.B	D7		Non-zero return on invalid address			*****
 		BNE.W	EXINVAL									*****
 		SUB.L	A3,D0		Get the length						*****
 		BRA.S	EXEND									*****
 EXQUICK		MOVE.L	#$100,D0								*****
 		BRA.S	EXEND									*****
-EXLENG		BSR.W	PARNUM		Find the length						*****
+EXLENG		BSR.W	PARNUM0		Find the length						*****
 		TST.B	D7		Check for error						*****
 		BNE.W	EXINVAL									*****
 EXEND		LEA.L	CRLF,A4									*****
