@@ -172,6 +172,7 @@ memInit		EQU	*									*****
 		LEA.L	msgOK,A0								*****
 		BSR.W	printString								*****
 		MOVE.B	#0,ECHO(A6)	ENABLE LOCAL ECHO					*****
+		MOVE.B	#0,UCASE(A6)	ENABLE UPPERCASE CONVERSION				*****
 		LEA	BANNER,A4	POINT TO BANNER						*****
 		BSR.W	HEADING		PRINT THE BANNER					*****
 WARM		CLR.L	D7		CLEAR ERROR FLAG					*****
@@ -377,8 +378,7 @@ PRNT1		MOVE.B	(A4)+,D0	GET CHARACTER TO BE PRINTED				*****
 PRNT2		MOVE.L	(A7)+,D0	RESTORE REGISTER					*****
 		RTS										*****
 												 ***
-HEADING		BSR	PRINTSTRING								*****
-		BRA	NEWLINE									*****
+HEADING		BRA	PRINTSTRING								*****
 												 ***
 TIDY		LEA	LNBUF(A6),A0	POINT A0 TO LINE BUFFER					*****
 		LEA	(A0),A1		POINT A1 TO START OF LINE BUFFER			*****
@@ -688,7 +688,7 @@ EXAMINE		BSR	PARNUM		Get start address					*****
 		TST.B	D7		Test for input error					*****
 		BNE.W	EXAM3		Bail on error						*****
 		MOVE.L	D0,A3		A3 points to location to be examined			*****
-		BSR	NEWLINE									*****
+*		BSR	NEWLINE									*****
 EXLOOP		MOVE.B	(A0)+,D0	Grab next character in command buffer			*****
 		CMP.B	#' ',D0		Ignore spaces						*****
 		BEQ.S	EXLOOP									*****
@@ -712,18 +712,20 @@ EXQUICK		MOVE.L	#$100,D0								*****
 EXLENG		BSR.W	PARNUM		Find the length						*****
 		TST.B	D7		Check for error						*****
 		BNE.W	EXINVAL									*****
-EXEND		LEA.L	CRLF,A0									*****
+EXEND		LEA.L	CRLF,A4									*****
 		BSR.W	PRINTSTRING								*****
 		MOVE.L	A3,A0		Parameter parsing complete, pass to dispRAM and return	*****
 		BSR.W	dispRAM									*****
 		RTS										*****
-EXINTER		LEA.L	CRLF,A0									*****
+EXINTER		LEA.L	CRLF,A4									*****
 		BSR.W	PRINTSTRING								*****
 		MOVE.L	A3,A0		Interactive mode, set current address			*****
 		MOVE.L	#$10,D0		16 bytes						*****
 		BSR.W	dispRAM									*****
 		ADD.L	#$10,A3		Update current address					*****
-EXINTEND	BSR.W	GETCHAR		Grab a character					*****
+EXINTEND	LEA.L	EXPROMPT,A4	Show Examine prompt					*****
+		BSR.W	PRINTSTRING								*****
+		BSR.W	GETCHAR		Grab a character					*****
 		CMP.B	#CR,D0		Display another line					*****
 		BEQ.S	EXINTER									*****
 		CMP.B	#' ',D0		Display a page (256 bytes)				*****
@@ -731,15 +733,15 @@ EXINTEND	BSR.W	GETCHAR		Grab a character					*****
 		CMP.B	#LF,D0		Disregard linefeeds					*****
 		BEQ.S	EXINTEND								*****
 		RTS			Else Exit						*****
-EXINTERPG	LEA.L	CRLF,A0									*****
+EXINTERPG	LEA.L	CRLF,A4									*****
 		BSR.W	PRINTSTRING								*****
 		MOVE.L	A3,A0									*****
 		MOVE.L	#$100,D0	256 bytes						*****
 		BSR.W	dispRAM									*****
 		ADD.L	#$100,A3	Adjust current address					*****
 		BRA.S	EXINTEND								*****
-		BSR.W	ADR_DB		Print current address and requested values there	*****
-		BSR	NEWLINE									*****
+*		BSR.W	ADR_DB		Print current address and requested values there	*****
+*		BSR	NEWLINE									*****
 EXAM3		RTS										*****
 EXINVAL		OR.B	#2,D7		Set error flag before returning				*****
 		RTS										*****
@@ -871,6 +873,7 @@ msgColonSpc	DC.B	': ',0									*****
 BANNER		DC.B	'RHOMBUS Monitor version 0.2015.12.27.1',0,0				*****
 CRLF		DC.B	CR,LF,0									*****
 PROMPT		DC.B	CR,LF,'>',0								*****
+EXPROMPT	DC.B	CR,LF,'EX>',0
 HEADER		DC.B	CR,LF,'S','1',0,0
 TAIL		DC.B	'S9  ',0,0
 MES1		DC.B	' SR  =  ',0
