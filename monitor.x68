@@ -333,7 +333,7 @@ OPEN4		MOVEM.L	(A7)+,A1-A3/D0-D4							*****
 												 ***
 NEWLINE		EQU	*		MOVE CURSOR TO BEGINNING OF NEW LINE			*****
 		MOVEM.L	A4,-(A7)	SAVE REGISTER						*****
-		LEA	CRLF,A4		POINT TO CR/LF STRING					*****
+		LEA	PROMPT,A4	POINT TO PROMPT STRING					*****
 		BSR.S	PRINTSTRING	PRINT STRING						*****
 		MOVEM.L	(A7)+,A4	RESTORE REGISTER					*****
 		RTS										*****
@@ -430,8 +430,8 @@ PARAM6   MOVE.L   (A7)+,D1          Restore working register
 	RTS			Return with error						*****
 												 ***
 PARNUM	MOVE.L	D1,-(A7)		Save D1							*****
-	CLR.L	D1			Clear input accumulator					*****
 	MOVE.L	BUFPT(A6),A0		A0 points to parameter in buffer			*****
+PARNUM0	CLR.L	D1			Clear input accumulator					*****
 PARNUM1	MOVE.B	(A0)+,D0		Read character from the line buffer			*****
 	CMP.B	#SPACE,D0		Ignore leading spaces					*****
 	BEQ.S	PARNUM1			Grab another character until non-space found		*****
@@ -568,7 +568,8 @@ dispRAM		MOVEM.L	D2-D4/A2,-(SP)	Save registers						************************
 .unprintable	MOVE.B	#'.',D0									*****
 		BSR.W	PUTCHAR									*****
 		BRA.S	.endbytesLoop								*****
-.endline	BSR.W	NEWLINE									*****
+.endline	LEA.L	CRLF,A4									*****
+		BSR.W	PRINTSTRING								*****
 		TST.L	D2									*****
 		BLE.S	.end									*****		**
 		BRA.W	.line									*****		****
@@ -701,7 +702,7 @@ EXLOOP		MOVE.B	(A0)+,D0	Grab next character in command buffer			*****
 		BEQ.S	EXQUICK									*****
 		MOVE.L	#1,D0		Otherwise read a single byte				*****
 		BRA.S	EXEND									*****
-EXRANGE		BSR.W	PARNUM		Find ending address					*****
+EXRANGE		BSR.W	PARNUM0		Find ending address					*****
 		TST.B	D7		Non-zero retorn on invalid address			*****
 		BNE.W	EXINVAL									*****
 		SUB.L	A3,D0		Get the length						*****
@@ -711,10 +712,14 @@ EXQUICK		MOVE.L	#$100,D0								*****
 EXLENG		BSR.W	PARNUM		Find the length						*****
 		TST.B	D7		Check for error						*****
 		BNE.W	EXINVAL									*****
-EXEND		MOVE.L	A3,A0		Parameter parsing complete, pass to dispRAM and return	*****
+EXEND		LEA.L	CRLF,A0									*****
+		BSR.W	PRINTSTRING								*****
+		MOVE.L	A3,A0		Parameter parsing complete, pass to dispRAM and return	*****
 		BSR.W	dispRAM									*****
 		RTS										*****
-EXINTER		MOVE.L	A3,A0		Interactive mode, set current address			*****
+EXINTER		LEA.L	CRLF,A0									*****
+		BSR.W	PRINTSTRING								*****
+		MOVE.L	A3,A0		Interactive mode, set current address			*****
 		MOVE.L	#$10,D0		16 bytes						*****
 		BSR.W	dispRAM									*****
 		ADD.L	#$10,A3		Update current address					*****
@@ -726,7 +731,9 @@ EXINTEND	BSR.W	GETCHAR		Grab a character					*****
 		CMP.B	#LF,D0		Disregard linefeeds					*****
 		BEQ.S	EXINTEND								*****
 		RTS			Else Exit						*****
-EXINTERPG	MOVE.L	A3,A0									*****
+EXINTERPG	LEA.L	CRLF,A0									*****
+		BSR.W	PRINTSTRING								*****
+		MOVE.L	A3,A0									*****
 		MOVE.L	#$100,D0	256 bytes						*****
 		BSR.W	dispRAM									*****
 		ADD.L	#$100,A3	Adjust current address					*****
@@ -862,7 +869,8 @@ msgDCBinit	DC.B	'Creating Device Control Blocks... ',0					*****
 msgColonSpc	DC.B	': ',0									*****
 
 BANNER		DC.B	'RHOMBUS Monitor version 0.2015.12.27.1',0,0				*****
-CRLF		DC.B	CR,LF,'>',0								*****
+CRLF		DC.B	CR,LF,0									*****
+PROMPT		DC.B	CR,LF,'>',0								*****
 HEADER		DC.B	CR,LF,'S','1',0,0
 TAIL		DC.B	'S9  ',0,0
 MES1		DC.B	' SR  =  ',0
