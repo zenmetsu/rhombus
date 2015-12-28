@@ -522,8 +522,61 @@ OUT8X    SWAP     D0                Get MS word in LS position
          SWAP     D0                Restore LS word
          BRA      OUT4X             Print LS word and return
 												 ***
-dispRAM		RTS
-												  *
+dispRAM		MOVEM.L	D2-D4/A2,-(SP)	Save registers						************************
+		MOVE.L	A0,A2		Save start address					************************
+		MOVE.L	D0,D2		Save number of bytes					************************
+.line		MOVE.L	A2,D0									*****
+		BSR.W	OUT8X		Starting address of the line				*****
+		LEA	msgColonSpc,A4								*****
+		BSR.W	PRINTSTRING								*****
+		MOVE.L	#16,D3		16 bytes printed on a line				*****
+		MOVE.L	D3,D4		Save number of bytes on this line			*****
+.hexbyte	TST.L	D2		Check if out of bytes					*****
+		BEQ.S	.endbytesShort								*****
+		TST.B	D3		Check if line is finished				*****
+		BEQ.S	.endbytes								*****
+		MOVE.B	(A2)+,D0	Read in a byte from RAM					*****
+		BSR.W	OUT2X		Display it						*****
+		MOVE.B	#' ',D0									*****
+		BSR.W	PUTCHAR		Separate bytes for readability				*****
+		SUBQ.L	#1,D3									*****
+		SUBQ.L	#1,D2									*****
+		BRA.S	.hexbyte								*****
+.endbytesShort	SUB.B	D3,D4		Set D4 to actual number of bytes on this line		*****
+		MOVE.B	#' ',D0									*****
+.endbytesShrtLp	TST.B	D3		Check if line ended					*****
+		BEQ.S	.endbytes								*****
+		MOVE.B	#' ',D0									*****
+		BSR.W	PUTCHAR		Pad end with spaces					*****
+		MOVE.B 	#' ',D0									*****
+		BSR.W	PUTCHAR		Pad end with spaces					*****
+		MOVE.B 	#' ',D0									*****
+		BSR.W	PUTCHAR		Pad end with spaces					*****
+		SUBQ.B	#1,D3									*****
+		BRA.S	.endbytesShrtLp								*****
+.endbytes	SUBA.L	D4,A2		Return to the start address of this line		*****
+.endbytesLoop	TST.B	D4		Check if done printing ASCII				*****
+		BEQ	.endline								*****
+		SUBQ.B	#1,D4									*****
+		MOVE.B	(A2)+,D0	Read the byte						*****
+		CMP.B	#' ',D0		Check if character is in printable range		*****
+		BLT.S	.unprintable								*****
+		CMP.B	#'~',D0		Highest printable character				*****
+		BGT.S	.unprintable								*****
+		BSR.W	PUTCHAR									*****
+		BRA.S	.endbytesLoop								*****
+.unprintable	MOVE.B	#'.',D0									*****
+		BSR.W	PUTCHAR									*****
+		BRA.S	.endbytesLoop								*****
+.endline	BSR.W	NEWLINE									*****
+		TST.L	D2									*****
+		BLE.S	.end									*****		**
+		BRA.W	.line									*****		****
+.end		MOVEM.L	(SP)+,D2-D4/A2	Restore registers					**********************		
+		RTS										************************	
+										**************************************
+										*********************		****
+										*********************		**												  *
 *****************************************************************************************************
 *****************************************************************************************************
 * COMMAND SUBROUTINES SECTION									*****
@@ -630,59 +683,59 @@ PSPACE	MOVE.B   D0,-(A7)	Print a single space						*****
 *		e ADDR+LEN	Display LEN bytes following ADDR				*****
 *		e ADDR;		Interactive mode: SPACE shows 16 lines, ENTER shows 1		*****
 												*****
-EXAMINE	BSR	PARNUM		Get start address						*****
-	TST.B	D7		Test for input error						*****
-	BNE.W	EXAM3		Bail on error							*****
-	MOVE.L	D0,A3		A3 points to location to be examined				*****
-	BSR	NEWLINE										*****
-EXLOOP	MOVE.B	(A0)+,D0	Grab next character in command buffer				*****
-	CMP.B	#' ',D0		Ignore spaces							*****
-	BEQ.S	EXLOOP										*****
-	CMP.B	#'-',D0		Range requested							*****
-	BEQ.S	EXRANGE										*****
-	CMP.B	#'+',D0		Length requested						*****
-	BEQ.S	EXLENG										*****
-	CMP.B	#';',D0		Interactive mode requested					*****
-	BEQ.S	EXINTER										*****
-	CMP.B	#'.',D0		Quick line requested						*****
-	BEQ.S	EXQUICK										*****
-	MOVE.L	#1,D0		Otherwise read a single byte					*****
-	BRA.S	EXEND										*****
-EXRANGE	BSR.W	PARNUM		Find ending address						*****
-	TST.B	D7		Non-zero retorn on invalid address				*****
-	BNE.W	EXINVAL										*****
-	SUB.L	A3,D0		Get the length							*****
-	BRA.S	EXEND										*****
-EXQUICK	MOVE.L	#$100,D0									*****
-	BRA.S	EXEND										*****
-EXLENG	BSR.W	PARNUM		Find the length							*****
-	TST.B	D7		Check for error							*****
-	BNE.W	EXINVAL										*****
-EXEND	MOVE.L	A3,A0		Parameter parsing complete, pass to dispRAM and return		*****
-	BSR.W	dispRAM										*****
-	RTS											*****
-EXINTER	MOVE.L	A3,A0		Interactive mode, set current address				*****
-	MOVE.L	#$10,D0		16 bytes							*****
-	BSR.W	dispRAM										*****
-	ADD.L	#$10,A3		Update current address						*****
-EXINTND	BSR.W	GETCHAR		Grab a character						*****
-	CMP.B	#CR,D0		Display another line						*****
-	BEQ.S	EXINTER										*****
-	CMP.B	#' ',D0		Display a page (256 bytes)					*****
-	BEQ.S	EXITERP										*****
-	CMP.B	#LF,D0		Disregard linefeeds						*****
-	BEQ.S	EXINTND										*****
-	RTS			Else Exit							*****
-EXITERP	MOVE.L	A3,A0										*****
-	MOVE.L	#$100,D0	256 bytes							*****
-	BSR.W	dispRAM										*****
-	ADD.L	#$100,A3	Adjust current address						*****
-	BRA.S	EXINTND										*****
-	BSR.W	ADR_DB		Print current address and requested values there		*****
-	BSR	NEWLINE										*****
-EXAM3	RTS											*****
-EXINVAL	OR.B	#2,D7		Set error flag before returning					*****
-	RTS
+EXAMINE		BSR	PARNUM		Get start address					*****
+		TST.B	D7		Test for input error					*****
+		BNE.W	EXAM3		Bail on error						*****
+		MOVE.L	D0,A3		A3 points to location to be examined			*****
+		BSR	NEWLINE									*****
+EXLOOP		MOVE.B	(A0)+,D0	Grab next character in command buffer			*****
+		CMP.B	#' ',D0		Ignore spaces						*****
+		BEQ.S	EXLOOP									*****
+		CMP.B	#'-',D0		Range requested						*****
+		BEQ.S	EXRANGE									*****
+		CMP.B	#'+',D0		Length requested					*****
+		BEQ.S	EXLENG									*****
+		CMP.B	#';',D0		Interactive mode requested				*****
+		BEQ.S	EXINTER									*****
+		CMP.B	#'.',D0		Quick line requested					*****
+		BEQ.S	EXQUICK									*****
+		MOVE.L	#1,D0		Otherwise read a single byte				*****
+		BRA.S	EXEND									*****
+EXRANGE		BSR.W	PARNUM		Find ending address					*****
+		TST.B	D7		Non-zero retorn on invalid address			*****
+		BNE.W	EXINVAL									*****
+		SUB.L	A3,D0		Get the length						*****
+		BRA.S	EXEND									*****
+EXQUICK		MOVE.L	#$100,D0								*****
+		BRA.S	EXEND									*****
+EXLENG		BSR.W	PARNUM		Find the length						*****
+		TST.B	D7		Check for error						*****
+		BNE.W	EXINVAL									*****
+EXEND		MOVE.L	A3,A0		Parameter parsing complete, pass to dispRAM and return	*****
+		BSR.W	dispRAM									*****
+		RTS										*****
+EXINTER		MOVE.L	A3,A0		Interactive mode, set current address			*****
+		MOVE.L	#$10,D0		16 bytes						*****
+		BSR.W	dispRAM									*****
+		ADD.L	#$10,A3		Update current address					*****
+EXINTEND	BSR.W	GETCHAR		Grab a character					*****
+		CMP.B	#CR,D0		Display another line					*****
+		BEQ.S	EXINTER									*****
+		CMP.B	#' ',D0		Display a page (256 bytes)				*****
+		BEQ.S	EXINTERPG								*****
+		CMP.B	#LF,D0		Disregard linefeeds					*****
+		BEQ.S	EXINTEND								*****
+		RTS			Else Exit						*****
+EXINTERPG	MOVE.L	A3,A0									*****
+		MOVE.L	#$100,D0	256 bytes						*****
+		BSR.W	dispRAM									*****
+		ADD.L	#$100,A3	Adjust current address					*****
+		BRA.S	EXINTEND								*****
+		BSR.W	ADR_DB		Print current address and requested values there	*****
+		BSR	NEWLINE									*****
+EXAM3		RTS										*****
+EXINVAL		OR.B	#2,D7		Set error flag before returning				*****
+		RTS										*****
 												 ***
 												  *
 ****************************************							*************************
@@ -801,11 +854,12 @@ MFPEXC		EQU	*								      *********
 *****************************************************************************************************
 * STRINGS AND FIXED PARAMETERS									*****
 												*****
-msgPOR		DC.B	'<RESET>',CR,LF,0
+msgPOR		DC.B	'<RESET>',CR,LF,0							*****
 msgLORAMck	DC.B	'Checking low memory...            ',0					*****
-msgOK		DC.B	'OK',CR,LF,0
+msgOK		DC.B	'OK',CR,LF,0								*****
 msgEXTABinit	DC.B	'Initializing Exception Table...   ',0					*****
 msgDCBinit	DC.B	'Creating Device Control Blocks... ',0					*****
+msgColonSpc	DC.B	': ',0									*****
 
 BANNER		DC.B	'RHOMBUS Monitor version 0.2015.12.27.1',0,0				*****
 CRLF		DC.B	CR,LF,'>',0								*****
