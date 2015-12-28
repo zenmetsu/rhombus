@@ -427,7 +427,47 @@ PARAM4   MOVE.L   A0,BUFPT(A6)     Save pointer in memory
          BRA.S    PARAM6            Return without error
 PARAM5   OR.B     #2,D7             Set error flag before return
 PARAM6   MOVE.L   (A7)+,D1          Restore working register
-         RTS                        Return with error
+	RTS			Return with error						*****
+												 ***
+PARNUM	MOVE.L	D1,-(A7)		Save D1							*****
+	CLR.L	D1			Clear input accumulator					*****
+	MOVE.L	BUFPT(A6),A0		A0 points to parameter in buffer			*****
+PARNUM1	MOVE.B	(A0)+,D0		Read character from the line buffer			*****
+	CMP.B	#SPACE,D0		Ignore leading spaces					*****
+	BEQ.S	PARNUM1			Grab another character until non-space found		*****
+	CMP.B	#'0',D0			Look for hex digits 0-9					*****
+	BLT.S	NMINVAL										*****
+	CMP.B	#'9',D0										*****
+	BLE.S	PARNUM2										*****
+	CMP.B	#'A',D0			Look for hex digits A-F					*****
+	BLT.S	NMINVAL										*****
+	CMP.B	#'F',D0										*****
+	BLE.S	PARNUM3										*****
+NMINVAL	OR.B	#2,D7			Set error flag before return				*****
+PARNUM6	MOVE.L	(A7)+,D1		Restore working register				*****
+	RTS											*****
+PARNUM3	SUB.B	#'7',D0			Convert 'A' to 10, and so on...				*****
+	BRA.S	PARLOOP										*****
+PARNUM2	SUB.B	#'0',D0			Convert '0' to 0, and so on...				*****
+PARLOOP	MOVE.B	(A0)+,D1		Read in another digit					*****
+	CMP.B	#'0',D1			Look for hex digits 0-9					*****
+	BLT.S	PARNEND			End if non-hex						*****
+	CMP.B	#'9',D1										*****
+	BLE.S	PARCHR1										*****
+	CMP.B	#'A',D1			Look for hex digits A-F					*****
+	BLT.S	PARNEND										*****
+	CMP.B	#'F',D1										*****
+	BLE.S	PARCHR2										*****
+PARNEND	SUBQ.L	#1,A0			Roll back buffer on non-hex				*****
+	MOVE.L	(A7)+,D1		Restore D1						*****
+	RTS											*****
+PARCHR2	SUB.B	#'7',D1			Convert 'A' to 10, and so on				*****
+	BRA.S	PARCHR3										*****
+PARCHR1	SUB.B	#'0',D1			Convert '0' to 0, and so on				*****
+PARCHR3	LSL.L	#4,D0			Shift to next nybble					*****
+	ADD.B	D1,D0			Place in current nybble					*****
+	BRA.S	PARLOOP			Repeat until non-hex					*****
+
 												 ***
 HEX      BSR      GETCHAR           Get a character from input device
          SUB.B    #$30,D0           Convert to binary
@@ -481,6 +521,8 @@ OUT8X    SWAP     D0                Get MS word in LS position
          BSR      OUT4X             Print MS word
          SWAP     D0                Restore LS word
          BRA      OUT4X             Print LS word and return
+												 ***
+dispRAM		RTS
 												  *
 *****************************************************************************************************
 *****************************************************************************************************
@@ -530,46 +572,117 @@ SRCH6		LEA.L	-4(A4),A3         Calculate address of command entry			*****
 SRCH7		AND.B	#$FE,CCR	Fail - clear carry to indicate				*****
 		RTS			command not found and return				*****
 												 ***
-MEMORY   BSR      PARAM             Get start address from line buffer
-         TST.B    D7                Test for input error
-         BNE.S    MEM3              If error then exit
-         MOVE.L   D0,A3             A3 points to location to be opened
-MEM1     BSR      NEWLINE
-         BSR.S    ADR_DAT           Print current address and contents
-         BSR.S    PSPACE             update pointer, A3, and O/P space
-         BSR      GETCHAR           Input char to decide next action
-         CMP.B    #CR,D0            If carriage return then exit
-         BEQ.S    MEM3              Exit
-         CMP.B    #'-',D0           If "-" then move back
-         BNE.S    MEM2              Else skip wind-back procedure
-         LEA.L    -4(A3),A3         Move pointer back 2+2
-         BRA      MEM1              Repeat until carriage return
-MEM2     CMP.B    #SPACE,D0         Test for space (= new entry)
-         BNE.S    MEM1              If not space then repeat
-         BSR      WORD              Else get new word to store
-         TST.B    D7                Test for input error
-         BNE.S    MEM3              If error then exit
-         MOVE.W   D0,-2(A3)         Store new word
-         BRA      MEM1              Repeat until carriage return
-MEM3     RTS
-
-ADR_DAT  MOVE.L   D0,-(A7)          Print the contents of A3 and the
-         MOVE.L   A3,D0             word pointed at by A3.
-         BSR      OUT8X              and print current address
-         BSR.S    PSPACE            Insert delimiter
-         MOVE.W   (A3),D0           Get data at this address in D0
-         BSR      OUT4X              and print it
-         LEA.L    2(A3),A3          Point to next address to display
-         MOVE.L   (A7)+,D0          Restore D0
-         RTS
-*
-PSPACE   MOVE.B   D0,-(A7)          Print a single space
-         MOVE.B   #SPACE,D0
-         BSR      PUTCHAR
-         MOVE.B   (A7)+,D0
-         RTS
-
- 
+MEMORY	BSR	PARAM             Get start address from line buffer
+	TST.B	D7                Test for input error
+	BNE.S	MEM3              If error then exit
+	MOVE.L	D0,A3             A3 points to location to be opened
+MEM1	BSR	NEWLINE
+	BSR.S	ADR_DW		Print current address and contents
+	BSR.S	PSPACE             update pointer, A3, and O/P space
+	BSR	GETCHAR           Input char to decide next action
+	CMP.B	#CR,D0            If carriage return then exit
+	BEQ.S	MEM3              Exit
+	CMP.B	#'-',D0           If "-" then move back
+	BNE.S	MEM2              Else skip wind-back procedure
+	LEA.L	-4(A3),A3         Move pointer back 2+2
+	BRA	MEM1              Repeat until carriage return
+MEM2	CMP.B	#SPACE,D0         Test for space (= new entry)
+	BNE.S	MEM1		If not space then repeat
+	BSR	WORD		Else get new word to store
+	TST.B	D7		Test for input error
+	BNE.S	MEM3		If error then exit						*****
+	MOVE.W	D0,-2(A3)	Store new word							*****
+	BRA	MEM1		Repeat until carriage return					*****
+MEM3	RTS											*****
+												 ***
+ADR_DB	MOVE.L   D0,-(A7)	Print the contents of A3 and the				*****
+	MOVE.L   A3,D0		byte pointed at by A3.						*****
+	BSR      OUT8X		Print current address						*****
+	BSR.S    PSPACE		Insert delimiter						*****
+	MOVE.W   (A3),D0	Get data at this address in D0					*****
+	BSR      OUT2X		and print it							*****
+	LEA.L    2(A3),A3	Point to next address to display				*****
+	MOVE.L   (A7)+,D0	Restore D0							*****
+	RTS											*****
+												 ***
+ADR_DW	MOVE.L   D0,-(A7)	Print the contents of A3 and the				*****
+	MOVE.L   A3,D0		word pointed at by A3.						*****
+	BSR      OUT8X		print current address						*****
+	BSR.S    PSPACE		Insert delimiter						*****
+	MOVE.W   (A3),D0	Get data at this address in D0					*****
+	BSR      OUT4X		and print it							*****
+	LEA.L    2(A3),A3	Point to next address to display				*****
+	MOVE.L   (A7)+,D0	Restore D0							*****
+	RTS											*****
+												 ***
+PSPACE	MOVE.B   D0,-(A7)	Print a single space						*****
+	MOVE.B   #SPACE,D0									*****
+	BSR      PUTCHAR									*****
+	MOVE.B   (A7)+,D0									*****
+	RTS											*****
+												 ***
+********************************								*****
+* Examine											*****
+*												*****
+*   Modes:	e ADDR		Display a single byte						*****
+*		e ADDR.		Display a single page (16 lines, 256 bytes)			*****
+*		e ADDR-ADDR	Display all bytes between two addresses				*****
+*		e ADDR+LEN	Display LEN bytes following ADDR				*****
+*		e ADDR;		Interactive mode: SPACE shows 16 lines, ENTER shows 1		*****
+												*****
+EXAMINE	BSR	PARNUM		Get start address						*****
+	TST.B	D7		Test for input error						*****
+	BNE.W	EXAM3		Bail on error							*****
+	MOVE.L	D0,A3		A3 points to location to be examined				*****
+	BSR	NEWLINE										*****
+EXLOOP	MOVE.B	(A0)+,D0	Grab next character in command buffer				*****
+	CMP.B	#' ',D0		Ignore spaces							*****
+	BEQ.S	EXLOOP										*****
+	CMP.B	#'-',D0		Range requested							*****
+	BEQ.S	EXRANGE										*****
+	CMP.B	#'+',D0		Length requested						*****
+	BEQ.S	EXLENG										*****
+	CMP.B	#';',D0		Interactive mode requested					*****
+	BEQ.S	EXINTER										*****
+	CMP.B	#'.',D0		Quick line requested						*****
+	BEQ.S	EXQUICK										*****
+	MOVE.L	#1,D0		Otherwise read a single byte					*****
+	BRA.S	EXEND										*****
+EXRANGE	BSR.W	PARNUM		Find ending address						*****
+	TST.B	D7		Non-zero retorn on invalid address				*****
+	BNE.W	EXINVAL										*****
+	SUB.L	A3,D0		Get the length							*****
+	BRA.S	EXEND										*****
+EXQUICK	MOVE.L	#$100,D0									*****
+	BRA.S	EXEND										*****
+EXLENG	BSR.W	PARNUM		Find the length							*****
+	TST.B	D7		Check for error							*****
+	BNE.W	EXINVAL										*****
+EXEND	MOVE.L	A3,A0		Parameter parsing complete, pass to dispRAM and return		*****
+	BSR.W	dispRAM										*****
+	RTS											*****
+EXINTER	MOVE.L	A3,A0		Interactive mode, set current address				*****
+	MOVE.L	#$10,D0		16 bytes							*****
+	BSR.W	dispRAM										*****
+	ADD.L	#$10,A3		Update current address						*****
+EXINTND	BSR.W	GETCHAR		Grab a character						*****
+	CMP.B	#CR,D0		Display another line						*****
+	BEQ.S	EXINTER										*****
+	CMP.B	#' ',D0		Display a page (256 bytes)					*****
+	BEQ.S	EXITERP										*****
+	CMP.B	#LF,D0		Disregard linefeeds						*****
+	BEQ.S	EXINTND										*****
+	RTS			Else Exit							*****
+EXITERP	MOVE.L	A3,A0										*****
+	MOVE.L	#$100,D0	256 bytes							*****
+	BSR.W	dispRAM										*****
+	ADD.L	#$100,A3	Adjust current address						*****
+	BRA.S	EXINTND										*****
+	BSR.W	ADR_DB		Print current address and requested values there		*****
+	BSR	NEWLINE										*****
+EXAM3	RTS											*****
+EXINVAL	OR.B	#2,D7		Set error flag before returning					*****
+	RTS
 												 ***
 												  *
 ****************************************							*************************
@@ -720,10 +833,13 @@ ERMES5		DC.B	'Breakpoint not active   ',0,0
 ERMES6		DC.B	'Uninitialized exception ',0,0
 ERMES7		DC.B	' Range error',0
 
-COMTAB		DC.B	8,3		MEMORY <address> examines contents of
-		DC.B	'MEMORY  '	<address> and allows them to be changed
-		DC.L	MEMORY-COMTAB
-		DC.B	0,0		TERMINATE COMMAND TABLE
+COMTAB		DC.B	8,3		MEMORY <address> shows contents of			*****
+		DC.B	'MEMORY  '	<address> and allows them to be changed			*****
+		DC.L	MEMORY-COMTAB								*****
+		DC.B	8,2		EXAMINE <address> shows memory contents			*****
+		DC.B	'EXAMINE '	in a more readable form, does not allow modifications	*****
+		DC.L	EXAMINE-COMTAB								*****
+		DC.B	0,0		TERMINATE COMMAND TABLE					*****
 ****************************************							*****
 *   Environment Parameter Equates								*****
 												*****
