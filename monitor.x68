@@ -750,6 +750,41 @@ EXAM3		RTS										*****
 EXINVAL		OR.B	#2,D7		Set error flag before returning				*****
 		RTS										*****
 												 ***
+EX_DIS  LEA.L   TSK_T(A6),A5      A5 points to display frame
+        LEA.L   MES3,A4       Point to heading
+        BSR     HEADING           and print it
+        MOVE.W  #7,D6             8 pairs of registers to display
+        CLR.B   D5                D5 is the line counter
+EX_D1   MOVE.B  D5,D0             Put current register number in D0
+        BSR     OUT1X             and print it
+        BSR     PSPACE            and a space
+        ADD.B   #1,D5             Update counter for next pair
+        MOVE.L  (A5),D0           Get data register to be displayed
+        BSR     OUT8X             from the frame and print it
+        LEA.L   MES4,A4       Print string of spaces
+        BSR.L   PRINTSTRING           between data and address registers
+        MOVE.L  32(A5),D0         Get address register to be displayed
+        BSR     OUT8X             which is 32 bytes on from data reg
+        BSR     NEWLINE
+        LEA.L   4(A5),A5          Point to next pair (ie Di, Ai)
+        DBRA    D6,EX_D1          Repeat until all displayed
+        LEA.L   32(A5),A5         Adjust pointer by 8 longwords
+        BSR     NEWLINE           to point to SSP
+        LEA.L   MES2A,A4      Point to "SS ="
+        BSR     PRINTSTRING           Print it
+        MOVE.L  (A5)+,D0          Get SSP from frame
+        BSR     OUT8X             and display it
+        BSR     NEWLINE
+        LEA.L   MES1,A4       Point to 'SR ='
+        BSR     PRINTSTRING           Print it
+        MOVE.W  (A5)+,D0          Get status register
+        BSR     OUT4X             Display status
+        BSR     NEWLINE
+        LEA.L   MES2,A4       Point to 'PC ='
+        BSR     PRINTSTRING           Print it
+        MOVE.L  (A5)+,D0          Get PC
+        BSR     OUT8X             Display PC
+        BRA     NEWLINE           Newline and return
 												  *
 ****************************************							*************************
 * MFP Transmit/Receive										*************************	
@@ -908,13 +943,16 @@ COMTAB		DC.B	8,3		MEMORY <address> shows contents of			*****
 		DC.B	8,2		EXAMINE <address> shows memory contents			*****
 		DC.B	'EXAMINE '	in a more readable form, does not allow modifications	*****
 		DC.L	EXAMINE-COMTAB								*****
+		DC.B	4,2		DISP displays the contents of the
+		DC.B	'DISP'		pseudo registers in TSK_T.
+		DC.L	EX_DIS-COMTAB
 		DC.B	0,0		TERMINATE COMMAND TABLE					*****
 ****************************************							*****
 *   Environment Parameter Equates								*****
 												*****
 MAXCHR		EQU	64		MAXIMUM LENGTH OF COMMAND LINE				*****
-		ORG	$F00
-DATA		EQU	$00000F00	DATA ORIGIN						*****
+		ORG	$1800
+DATA		EQU	$00001800	DATA ORIGIN						*****
 LNBUF		DS.B	MAXCHR		COMMAND LINE BUFFER					*****
 BUFEND		EQU	LNBUF+MAXCHR-1	END OF COMMAND LINE POINTER				*****
 BUFPT		DS.L	1		COMMAND LINE POINTER					*****
