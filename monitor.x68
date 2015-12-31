@@ -785,7 +785,46 @@ EX_D1   MOVE.B  D5,D0             Put current register number in D0
         MOVE.L  (A5)+,D0          Get PC
         BSR     OUT8X             Display PC
         BRA     NEWLINE           Newline and return
-												  *
+	
+REG_MOD  CLR.L   D1                  D1 to hold name of register
+         LEA.L   BUFPT(A6),A0        A0 contains address of buffer pointer
+         MOVE.L  (A0),A0             A0 now points to next char in buffer
+         MOVE.B  (A0)+,D1            Put first char of name in D1
+         ROL.W   #8,D1               Move char one place left
+         MOVE.B  (A0)+,D1            Get second char in D1
+         LEA.L   1(A0),A0            Move pointer past space in buffer
+         MOVE.L  A0,BUFPT(A6)        Update buffer pointer
+         CLR.L   D2                  D2 is the character pair counter
+         LEA.L   REGNAME(PC),A0      A0 points to string of character pairs
+         LEA.L   (A0),A1             A1 also points to string
+REG_MD1  CMP.W   (A0)+,D1            Compare a char pair with input
+         BEQ.S   REG_MD2             If match then exit loop
+         ADD.L   #1,D2               Else increment match counter
+         CMP.L   #19,D2              Test for end of loop
+         BNE     REG_MD1             Continue until all pairs matched
+         LEA.L   ERMES1(PC),A4       If here then error
+         BRA     PRINTSTRING         Display error and return
+REG_MD2  LEA.L   TSK_T(A6),A1        A1 points to display frame
+         ASL.L   #2,D2               Multiply offset by 4 (4 bytes/entry)
+         CMP.L   #72,D2              Test for address of PC
+         BNE.S   REG_MD3             If not PC then all is OK
+         SUB.L   #2,D2               else dec PC pointer as Sr is a word
+REG_MD3  LEA.L   (A1,D2),A2          Calculate address of entry in disptable
+         MOVE.L  (A2),D0             Get old contents
+         BSR     OUT8X               Display them
+         BSR     NEWLINE
+         BSR     PARAM               Get new data
+         TST.B   D7                  Test for input error
+         BEQ.S   REG_MD4             If no error then go and store data
+         LEA.L   ERMES1(PC),A4       Else point to error message
+         BRA     PRINTSTRING         print it and return
+REG_MD4  CMP.L   #68,D2              If this address is the SR then
+         BEQ.S   REG_MD5             we have only a word to store
+         MOVE.L  D0,(A2)             Else store new data in display frame
+         RTS
+REG_MD5  MOVE.W  D0,(A2)             Store SR (one word)
+         RTS
+											  *
 ****************************************							*************************
 * MFP Transmit/Receive										*************************	
 												*************************
@@ -943,9 +982,12 @@ COMTAB		DC.B	8,3		MEMORY <address> shows contents of			*****
 		DC.B	8,2		EXAMINE <address> shows memory contents			*****
 		DC.B	'EXAMINE '	in a more readable form, does not allow modifications	*****
 		DC.L	EXAMINE-COMTAB								*****
-		DC.B	4,2		DISP displays the contents of the
-		DC.B	'DISP'		pseudo registers in TSK_T.
-		DC.L	EX_DIS-COMTAB
+		DC.B	4,2		DISP displays the contents of the			*****
+		DC.B	'DISP'		pseudo registers in TSK_T				*****
+		DC.L	EX_DIS-COMTAB								*****
+		DC.B	4,3									*****
+		DC.B	'REG '		REG <register> <value> loads <value> into <register>	*****
+		DC.L	REG_MOD-COMTAB	at TSK_T used to preload register for GO or GB		*****
 		DC.B	0,0		TERMINATE COMMAND TABLE					*****
 ****************************************							*****
 *   Environment Parameter Equates								*****
