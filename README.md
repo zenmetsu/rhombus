@@ -18,11 +18,14 @@ via configuration.
 The system board currently consists of CPU, RAM, ROM, an MC68901 multifunction peripheral, and a Xilinx XC95108 CPLD.
 
 RAM sizing and error checking is in place.  Monitor has the ability to analyze or change memory contents.
+Secondary monitor written to expand functionality.  Register viewing/modification possible, as is vectored
+selection of input/output devices.
 
 Next steps:
-Code cleanup to reduce ROM size and increase efficiency
-Addition of an MC68681 DUART which will work as auxillary serial port as well as keyboard input
+
+--Addition of an MC68681 DUART which will work as auxillary serial port as well as keyboard input--
+Addition of FT245 USB FIFO for auxillary serial connection
 S-Record load over serial
 Increasing RAM data bus to 32bits.  ROM to remain 8bit due to simplicity of flashing devices.
 Floppy drive interface
-PS/2 Keyboard
+PS/2 Keyboard via intel N8042 microcontroller
