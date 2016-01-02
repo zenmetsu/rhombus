@@ -405,31 +405,31 @@ TIDY5		CMP.B	#CR,(A0)	TEST FOR CR						*****
 TIDY6		MOVE.L	A0,BUFPT(A6)	UPDATE BUFFER POINTER					*****
 		RTS										*****
 
-PARAM    MOVE.L   D1,-(A7)          Save D1
-         CLR.L    D1                Clear input accumulator
-         MOVE.L   BUFPT(A6),A0     A0 points to parameter in buffer
-PARAM1   MOVE.B   (A0)+,D0          Read character from line buffer
-         CMP.B    #SPACE,D0         Test for delimiter
-         BEQ.S    PARAM4            The permitted delimiter is a
-         CMP.B    #CR,D0            space or a carriage return
-         BEQ.S    PARAM4            Exit on either space or C/R
-         ASL.L    #4,D1             Shift accumulated result 4 bits left
-         SUB.B    #$30,D0           Convert new character to hex
-         BMI.S    PARAM5            If less than $30 then not-hex
-         CMP.B    #$09,D0           If less than 10
-         BLE.S    PARAM3            then continue
-         SUB.B    #$07,D0           Else assume $A - $F
-         CMP.B    #$0F,D0           If more than $F
-         BGT.S    PARAM5            then exit to error on not-hex
-PARAM3   ADD.B    D0,D1             Add latest nybble to total in D1
-         BRA      PARAM1            Repeat until delimiter found
-PARAM4   MOVE.L   A0,BUFPT(A6)     Save pointer in memory
-	MOVE.L	D1,PARAMETER(A6)	Save parameter in memory
-         MOVE.L   D1,D0             Put parameter in D0 for return
-         BRA.S    PARAM6            Return without error
-PARAM5   OR.B     #2,D7             Set error flag before return
-PARAM6   MOVE.L   (A7)+,D1          Restore working register
-	RTS			Return with error						*****
+PARAM		MOVE.L	D1,-(A7)	Save D1
+        	CLR.L	D1		Clear input accumulator
+		MOVE.L	BUFPT(A6),A0	A0 points to parameter in buffer
+PARAM1		MOVE.B	(A0)+,D0	Read character from line buffer
+		CMP.B	#SPACE,D	Test for delimiter
+		BEQ.S	PARAM		The permitted delimiter is a
+		CMP.B	#CR,D		space or a carriage return
+		BEQ.S	PARAM		Exit on either space or C/R
+		ASL.L	#4,D		Shift accumulated result 4 bits left
+		SUB.B	#$30,D		Convert new character to hex
+		BMI.S	PARAM		If less than $30 then not-hex
+		CMP.B	#$09,D		If less than 10
+		BLE.S	PARAM		then continue
+		SUB.B	#$07,D		Else assume $A - $F
+		CMP.B	#$0F,D		If more than $F
+		BGT.S	PARAM		then exit to error on not-hex
+PARAM3		ADD.B	D0,D		Add latest nybble to total in D1
+		BRA	PARAM		Repeat until delimiter found
+PARAM4		MOVE.L	A0,BUFPT(A6	Save pointer in memory
+		MOVE.L	D1,PARAMETER(A6)	Save parameter in memory
+		MOVE.L	D1,D		Put parameter in D0 for return
+		BRA.S	PARAM		Return without error
+PARAM5		OR.B	#2,D		Set error flag before return
+PARAM6		MOVE.L	(A7)+,D1	Restore working register
+		RTS			Return with error					*****
 												 ***
 PARNUM	MOVE.L	BUFPT(A6),A0		A0 points to parameter in buffer			*****
 PARNUM0	MOVE.L	D1,-(A7)		Save D1							*****
