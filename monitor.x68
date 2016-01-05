@@ -231,7 +231,6 @@ TRAP3		RTE
 ER_BUS		RTE
 ER_ADDR		RTE
 ER_ILOP		RTE
-TRACE		RTE
 BRKPT		RTE
 
 
@@ -824,7 +823,129 @@ REG_MD4  CMP.L   #68,D2              If this address is the SR then
          RTS
 REG_MD5  MOVE.W  D0,(A2)             Store SR (one word)
          RTS
-											  *
+	
+*************************************************************************
+*
+*  GO executes a program either from a supplied address or
+*  by using the data in the display frame
+GO       BSR     PARAM               Get entry address (if any)
+         TST.B   D7                  Test for error in input
+         BEQ.S   GO1                 If D7 zero then OK
+         LEA.L   ERMES1,A4           Else point to error message,
+         BRA     PRINTSTRING         print it and return
+GO1      TST.L   D0                  If no address entered then get
+         BEQ.S   GO2                 address from display frame
+         MOVE.L  D0,TSK_T+70(A6)     Else save address in display frame
+         MOVE.W  #$2700,TSK_T+68(A6) Store dummy status in frame
+GO2      BRA.S   RESTORE             Restore volatile environment and go
+*
+GB       BSR     BR_SET              Same as go but presets breakpoints
+         BRA.S   GO                  Execute program
+
+*        RESTORE moves the volatile environment from the display
+*        frame and transfers it to the 68000's registers. This
+*        re-runs a program suspended after an exception
+*
+RESTORE  LEA.L   TSK_T(A6),A3        A3 points to display frame
+         LEA.L   74(A3),A3           A3 now points to end of frame + 4
+         LEA.L   4(A7),A7            Remove return address from stack
+         MOVE.W  #36,D0              Counter for 37 words to be moved
+REST1    MOVE.W  -(A3),-(A7)         Move word from display frame to stack
+         DBRA    D0,REST1            Repeat until entire frame moved
+         MOVEM.L (A7)+,D0-D7         Restore old data registers from stack
+         MOVEM.L (A7)+,A0-A6         Restore old address registers
+         LEA.L   8(A7),A7            Except SSP/USP - so adjust stack
+         RTE                         Return from exception to run program
+*
+TRACE    EQU     *                   TRACE exception (rudimentary version)
+         MOVE.L  MES12,A4            Point to heading
+         BSR     HEADING             Print it
+         BSR     GROUP1              Save volatile environment
+         BSR     EX_DIS              Display it
+         BRA     WARM                Return to monitor
+			
+
+*************************************************************************
+*  Breakpoint routines: BR_GET gets the address of a breakpoint and
+*  puts it in the breakpoint table. It does not plant it in the code.
+*  BR_SET plants all breakpoints in the code. NOBR removes one or all
+*  breakpoints from the table. KILL removes breakpoints from the code.
+*
+BR_GET   BSR     PARAM               Get breakpoint address in table
+         TST.B   D7                  Test for input error
+         BEQ.S   BR_GET1             If no error then continue
+         LEA.L   ERMES1,A4           Else display error
+         BRA     PRINTSTRING         and return
+BR_GET1  LEA.L   BP_TAB(A6),A3       A6 points to breakpoint table
+         MOVE.L  D0,A5               Save new BP address in A5
+         MOVE.L  D0,D6               and in D6 because D0 gets corrupted
+         MOVE.W  #7,D5               Eight entries to test
+BR_GET2  MOVE.L  (A3)+,D0            Read entry from breakpoint table
+         BNE.S   BR_GET3             If not zero display existing BP
+         TST.L   D6                  Only store a non-zero breakpoint
+         BEQ.S   BR_GET4
+         MOVE.L  A5,-4(A3)           Store new breakpoint in table
+         MOVE.W  (A5),(A3)           Save code at BP address in table
+         CLR.L   D6                  Clear D6 to avoid repetition
+BR_GET3  BSR     OUT8X               Display this breakpoint
+         BSR     NEWLINE
+BR_GET4  LEA.L   2(A3),A3            Step past stored op-code
+         DBRA    D5,BR_GET2          Repeat until all entries tested
+         RTS                         Return
+
+BR_SET   EQU     *                   Plant any breakpoints in user code
+         LEA.L   BP_TAB(A6),A0       A0 points to BP table
+         LEA.L   TSK_T+70(A6),A2     A2 points to PC in display frame
+         MOVE.L  (A2),A2             Now A2 contains value of PC
+         MOVE.W  #7,D0               Up to eight entries to plant
+BR_SET1  MOVE.L  (A0)+,D1            Read breakpoint address from table
+         BEQ.S   BR_SET2             If zero then skip planting
+         CMP.L   A2,D1               Don't want to plant BP at current PC
+         BEQ.S   BR_SET2             location, so skip planting if same
+         MOVE.L  D1,A1               Transfer BP address to address reg
+         MOVE.W  #TRAP_14,(A1)       Plant op-code for TRAP #14 in code
+BR_SET2  LEA.L   2(A0),A0            Skip past op-code field in table
+         DBRA    D0,BR_SET1          Repeat until all entries tested
+         RTS
+
+NOBR     EQU     *                   Clear one or all breakpoints
+         BSR     PARAM               Get BP address (if any)
+         TST.B   D7                  Test for input error
+         BEQ.S   NOBR1               If no error then skip abort
+         LEA.L   ERMES1,A4           Point to error message
+         BRA     PRINTSTRING         Display it and return
+NOBR1    TST.L   D0                  Test for null address (clear all)
+         BEQ.S   NOBR4               If no address then clear all entries
+         MOVE.L  D0,A1               Else just clear breakpoint in A1
+         LEA.L   BP_TAB(A6),A0       A0 points to BP table
+         MOVE.W  #7,D0               Up to eight entries to test
+NOBR2    MOVE.L  (A0)+,D1            Get entry and
+         LEA.L   2(A0),A0            skip past op-code field
+         CMP.L   A1,D1               Is this the one?
+         BEQ.S   NOBR3               If so go and clear entry
+         DBRA    D0,NOBR2            Repeat until all tested
+         RTS
+NOBR3    CLR.L   -6(A0)              Clear address in BP table
+         RTS
+NOBR4    LEA.L   BP_TAB(A6),A0       Clear all 8 entries in BP table
+         MOVE.W  #7,D0               Eight entries to clear
+NOBR5    CLR.L   (A0)+               Clear breakpoint address
+         CLR.W   (A0)+               Clear op-code field
+         DBRA    D0,NOBR5            Repeat until all done
+         RTS
+
+BR_CLR   EQU     *                   Remove breakpoints from code
+         LEA.L   BP_TAB(A6),A0       A0 points to breakpoint table
+         MOVE.W  #7,D0               Up to eight entries to clear
+BR_CLR1  MOVE.L  (A0)+,D1            Get address of BP in D1
+         MOVE.L  D1,A1               and put copy in A1
+         TST.L   D1                  Test this breakpoint
+         BEQ.S   BR_CLR2             If zero then skip BP clearing
+         MOVE.W  (A0),(A1)           Else restore op-code
+BR_CLR2  LEA.L   2(A0),A0            Skip past op-code field
+         DBRA    D0,BR_CLR1          Repeat until all tested
+         RTS
+							  *
 ****************************************							*************************
 * MFP Transmit/Receive										*************************	
 												*************************
@@ -947,13 +1068,13 @@ msgOK		DC.B	'OK',CR,LF,0								*****
 msgEXTABinit	DC.B	'Initializing Exception Table...   ',0					*****
 msgDCBinit	DC.B	'Creating Device Control Blocks... ',0					*****
 msgColonSpc	DC.B	': ',0									*****
-
-BANNER		DC.B	'RHOMBUS Monitor version 0.2016.01.01.0',0,0				*****
+												*****
+BANNER		DC.B	'RHOMBUS Monitor version 0.2016.01.03.0',0,0				*****
 CRLF		DC.B	CR,LF,0									*****
 PROMPT		DC.B	CR,LF,'>',0								*****
-EXPROMPT	DC.B	CR,LF,'EX>',0
-HEADER		DC.B	CR,LF,'S','1',0,0
-TAIL		DC.B	'S9  ',0,0
+EXPROMPT	DC.B	CR,LF,'EX>',0								*****
+HEADER		DC.B	CR,LF,'S','1',0,0							*****
+TAIL		DC.B	'S9  ',0,0								*****
 MES1		DC.B	' SR  =  ',0
 MES2		DC.B	' PC  =  ',0
 MES2A		DC.B	' SS  =  ',0
@@ -988,6 +1109,9 @@ COMTAB		DC.B	8,3		MEMORY <address> shows contents of			*****
 		DC.B	4,3									*****
 		DC.B	'REG '		REG <register> <value> loads <value> into <register>	*****
 		DC.L	REG_MOD-COMTAB	at TSK_T used to preload register for GO or GB		*****
+		DC.B	4,2		GO <address> starts program execution
+		DC.B	'GO  '		at <address> and loads regs from TSK_T
+		DC.L	GO-COMTAB
 		DC.B	0,0		TERMINATE COMMAND TABLE					*****
 ****************************************							*****
 *   Environment Parameter Equates								*****
