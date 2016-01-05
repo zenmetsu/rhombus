@@ -37,7 +37,7 @@
 *   Defines											*****
 												*****
 NOP		EQU	$4E71		STANDARD 68000 NOP INSTRUCTION				*****
-												*****
+TRAP_14		EQU	$4E4E		Code for TRAP #14												*****
 ****************************************							*****
 *   Addresses											*****
 												*****
@@ -227,11 +227,63 @@ TRAP2		CMP.B	#2,D1		D2 =  2 = Newline					*****
 		BSR	NEWLINE									*****
 		RTE										*****
 												 ***
-TRAP3		RTE
-ER_BUS		RTE
-ER_ADDR		RTE
-ER_ILOP		RTE
-BRKPT		RTE
+TRAP3   CMP.B   #3,D1             D1 = 3 = Get parameter from buffer
+        BNE.S   TRAP4
+        BSR     PARAM
+        RTE
+TRAP4   CMP.B   #4,D1             D1 = 4 = Print string pointed at by A4
+        BNE.S   TRAP5
+        BSR     PRINTSTRING
+        RTE
+TRAP5   CMP.B   #5,D1             D1 = 5 = Get a hex character
+        BNE.S   TRAP6
+        BSR     HEX
+        RTE
+TRAP6   CMP.B   #6,D1             D1 = 6 = Get a hex byte
+        BNE.S   TRAP7
+        BSR     BYTE
+        RTE
+TRAP7   CMP.B   #7,D1             D1 = 7 = Get a word
+        BNE.S   TRAP8
+        BSR     WORD
+        RTE
+TRAP8   CMP.B   #8,D1             D1 = 8 = Get a longword
+        BNE.S   TRAP9
+        BSR     LONGWD
+        RTE
+TRAP9   CMP.B   #9,D1             D1 = 9 = Output hex byte
+        BNE.S   TRAP10
+        BSR     OUT2X
+        RTE
+TRAP10  CMP.B   #10,D1            D1 = 10 = Output hex word
+        BNE.S   TRAP11
+        BSR     OUT4X
+        RTE
+TRAP11  CMP.B   #11,D1            D1 = 11 = Output hex longword
+        BNE.S   TRAP12
+        BSR     OUT8X
+        RTE
+TRAP12  CMP.B   #12,D1            D1 = 12 = Print a space
+        BNE.S   TRAP13
+        BSR     PSPACE
+        RTE
+TRAP13  CMP.B   #13,D1            D1 = 13 = Get a line of text into
+        BNE.S   TRAP14            the line buffer
+        BSR     GETLINE
+        RTE
+TRAP14  CMP.B   #14,D1            D1 = 14 = Tidy up the line in the
+        BNE.S   TRAP15            line buffer by removing leading
+        BSR     TIDY              leading and multiple embeded spaces
+        RTE
+TRAP15  CMP.B   #15,D1            D1 = 15 = Execute the command in
+        BNE.S   TRAP16            the line buffer
+        BSR     EXECUTE
+        RTE
+TRAP16  CMP.B   #16,D1            D1 = 16 = Call RESTORE to transfer
+        BNE.S   TRAP17            the registers in TSK_T to the 68000
+        BSR     RESTORE           and therefore execute a program
+        RTE
+TRAP17  RTE
 
 
 *****************************************************************************************************
@@ -794,14 +846,14 @@ REG_MOD  CLR.L   D1                  D1 to hold name of register
          LEA.L   1(A0),A0            Move pointer past space in buffer
          MOVE.L  A0,BUFPT(A6)        Update buffer pointer
          CLR.L   D2                  D2 is the character pair counter
-         LEA.L   REGNAME(PC),A0      A0 points to string of character pairs
+         LEA.L   REGNAME,A0          A0 points to string of character pairs
          LEA.L   (A0),A1             A1 also points to string
 REG_MD1  CMP.W   (A0)+,D1            Compare a char pair with input
          BEQ.S   REG_MD2             If match then exit loop
          ADD.L   #1,D2               Else increment match counter
          CMP.L   #19,D2              Test for end of loop
          BNE     REG_MD1             Continue until all pairs matched
-         LEA.L   ERMES1(PC),A4       If here then error
+         LEA.L   ERMES1,A4           If here then error
          BRA     PRINTSTRING         Display error and return
 REG_MD2  LEA.L   TSK_T(A6),A1        A1 points to display frame
          ASL.L   #2,D2               Multiply offset by 4 (4 bytes/entry)
@@ -815,7 +867,7 @@ REG_MD3  LEA.L   (A1,D2),A2          Calculate address of entry in disptable
          BSR     PARAM               Get new data
          TST.B   D7                  Test for input error
          BEQ.S   REG_MD4             If no error then go and store data
-         LEA.L   ERMES1(PC),A4       Else point to error message
+         LEA.L   ERMES1,A4           Else point to error message
          BRA     PRINTSTRING         print it and return
 REG_MD4  CMP.L   #68,D2              If this address is the SR then
          BEQ.S   REG_MD5             we have only a word to store
@@ -876,7 +928,7 @@ BR_GET   BSR     PARAM               Get breakpoint address in table
          BEQ.S   BR_GET1             If no error then continue
          LEA.L   ERMES1,A4           Else display error
          BRA     PRINTSTRING         and return
-BR_GET1  LEA.L   BP_TAB(A6),A3       A6 points to breakpoint table
+BR_GET1  LEA.L   BKPTAB(A6),A3       A6 points to breakpoint table
          MOVE.L  D0,A5               Save new BP address in A5
          MOVE.L  D0,D6               and in D6 because D0 gets corrupted
          MOVE.W  #7,D5               Eight entries to test
@@ -894,7 +946,7 @@ BR_GET4  LEA.L   2(A3),A3            Step past stored op-code
          RTS                         Return
 
 BR_SET   EQU     *                   Plant any breakpoints in user code
-         LEA.L   BP_TAB(A6),A0       A0 points to BP table
+         LEA.L   BKPTAB(A6),A0       A0 points to BP table
          LEA.L   TSK_T+70(A6),A2     A2 points to PC in display frame
          MOVE.L  (A2),A2             Now A2 contains value of PC
          MOVE.W  #7,D0               Up to eight entries to plant
@@ -917,7 +969,7 @@ NOBR     EQU     *                   Clear one or all breakpoints
 NOBR1    TST.L   D0                  Test for null address (clear all)
          BEQ.S   NOBR4               If no address then clear all entries
          MOVE.L  D0,A1               Else just clear breakpoint in A1
-         LEA.L   BP_TAB(A6),A0       A0 points to BP table
+         LEA.L   BKPTAB(A6),A0       A0 points to BP table
          MOVE.W  #7,D0               Up to eight entries to test
 NOBR2    MOVE.L  (A0)+,D1            Get entry and
          LEA.L   2(A0),A0            skip past op-code field
@@ -927,7 +979,7 @@ NOBR2    MOVE.L  (A0)+,D1            Get entry and
          RTS
 NOBR3    CLR.L   -6(A0)              Clear address in BP table
          RTS
-NOBR4    LEA.L   BP_TAB(A6),A0       Clear all 8 entries in BP table
+NOBR4    LEA.L   BKPTAB(A6),A0       Clear all 8 entries in BP table
          MOVE.W  #7,D0               Eight entries to clear
 NOBR5    CLR.L   (A0)+               Clear breakpoint address
          CLR.W   (A0)+               Clear op-code field
@@ -935,7 +987,7 @@ NOBR5    CLR.L   (A0)+               Clear breakpoint address
          RTS
 
 BR_CLR   EQU     *                   Remove breakpoints from code
-         LEA.L   BP_TAB(A6),A0       A0 points to breakpoint table
+         LEA.L   BKPTAB(A6),A0       A0 points to breakpoint table
          MOVE.W  #7,D0               Up to eight entries to clear
 BR_CLR1  MOVE.L  (A0)+,D1            Get address of BP in D1
          MOVE.L  D1,A1               and put copy in A1
@@ -1048,6 +1100,80 @@ MFPINIT		EQU	*		MC68901 INITIALIZATION ROUTINE				*****
 												*****
 EXCHND		EQU	*		GENERIC EXCEPTION HANDLER				*****
 		RTE										*****
+ER_ILOP	EQU      *                Illegal instruction exception
+        MOVE.L  A4,-(A7)          Save A4
+        LEA.L   MES10,A4          Point to heading
+        BSR     HEADING           Print it
+        MOVE.L  (A7)+,A4          Restore A4
+        BSR.S   GROUP2            Save registers in display frame
+        BSR     EX_DIS            Display registers saved in frame
+        BRA     WARM              Abort from illegal instruction
+*
+ER_BUS	EQU     *                 Bus error (group 1) exception
+        MOVE.L  A4,-(A7)          Save A4
+        LEA.L   MES8,A4           Point to heading
+        BSR     HEADING           Print it
+        MOVE.L  (A7)+,A4          Restore A4
+        BRA.S   GROUP1            Deal with group 1 exception
+*
+ER_ADDR	EQU     *                 Address error (group 1) exception
+        MOVE.L  A4,-(A7)          Save A4
+        LEA.L   MES9,A4           Point to heading
+        BSR     HEADING           Print it
+        MOVE.L  (A7)+,A4          Restore A4
+        BRA.S   GROUP1            Deal with group 1 exception
+
+BRKPT   EQU     *                   Deal with breakpoint
+        MOVEM.L D0-D7/A0-A6,-(A7)   Save all registers
+        BSR     BR_CLR              Clear breakpoints in code
+        MOVEM.L (A7)+,D0-D7/A0-A6   Restore registers
+        BSR.S   GROUP2            Treat as group 2 exception
+        LEA.L   MES11,A4      Point to heading
+        BSR     HEADING           Print it
+        BSR     EX_DIS            Display saved registers
+        BRA     WARM              Return to monitor
+
+*       GROUP1 is called by address and bus error exceptions
+*       These are "turned into group 2" exceptions (eg TRAP)
+*       by modifying the stack frame saved by a group 1 exception
+*
+GROUP1  MOVEM.L D0/A0,-(A7)       Save working registers
+        MOVE.L  18(A7),A0         Get PC from group 1 stack frame
+        MOVE.W  14(A7),D0         Get instruction from stack frame
+        CMP.W   -(A0),D0          Now backtrack to find the "correct PC"
+        BEQ.S   GROUP1A           by matching the op-code on the stack
+        CMP.W   -(A0),D0          with the code in the region of the
+        BEQ.S   GROUP1A           PC on the stack
+        CMP.W   -(A0),D0
+        BEQ.S   GROUP1A
+        CMP.W   -(A0),D0
+        BEQ.S   GROUP1A
+        SUBQ.L  #2,A0
+GROUP1A MOVE.L  A0,18(A7)          Restore modified PC to stack frame
+        MOVEM.L (A7)+,D0/A0        Restore working registers
+        LEA.L   8(A7),A7           Adjust stack pointer to group 1 type
+        BSR.S   GROUP2             Now treat as group 1 exception
+        BSR     EX_DIS             Display contents of exception frame
+        BRA     WARM               Exit to monitor - no RTE from group 2
+
+GROUP2  EQU     *                 Deal with group 2 exceptions
+        MOVEM.L A0-A7/D0-D7,-(A7) Save all registers on the stack
+        MOVE.W  #14,D0            Transfer D0 - D7, A0 - A6 from
+        LEA.L   TSK_T(A6),A0      the stack to the display frame
+GROUP2A MOVE.L  (A7)+,(A0)+       Move a register from stack to frame
+        DBRA    D0,GROUP2A        and repeat until D0-D7/A0-A6 moved
+        MOVE.L  USP,A2            Get the user stack pointer and put it
+        MOVE.L  A2,(A0)+          in the A7 position in the frame
+        MOVE.L  (A7)+,D0          Now transfer the SSP to the frame,
+        SUB.L   #10,D0            remembering to account for the
+        MOVE.L  D0,(A0)+          data pushed on the stack to this point
+        MOVE.L  (A7)+,A1          Copy TOS (return address) to A1
+        MOVE.W  (A7)+,(A0)+       Move SR to display frame
+        MOVE.L  (A7)+,D0          Get PC in D0
+        SUBQ.L  #2,D0             Move back to current instruction
+        MOVE.L  D0,(A0)+          Put adjusted PC in display frame
+        JMP     (A1)              Return from subroutine
+
 												*****
 ****************************************							*****
 *   MFP Exception Handler									*****
