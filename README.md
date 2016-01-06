@@ -19,7 +19,7 @@ The system board currently consists of CPU, RAM, ROM, an MC68901 multifunction p
 
 RAM sizing and error checking is in place.  Monitor has the ability to analyze or change memory contents.
 Secondary monitor written to expand functionality.  Register viewing/modification possible, as is vectored
-selection of input/output devices.
+selection of input/output devices.  Added NMI exception handler and trace/breakpoint functionality.
 
 Next steps:
 
