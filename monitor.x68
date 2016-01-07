@@ -894,6 +894,20 @@ GO2      BRA.S   RESTORE             Restore volatile environment and go
 GB       BSR     BR_SET              Same as go but presets breakpoints
          BRA.S   GO                  Execute program
 
+*************************************************************************
+*
+* JUMP causes execution to begin at the address in the line buffer
+*
+JUMP     BSR     PARAM              Get address from buffer
+         TST.B   D7                 Test for input error
+         BNE.S   JUMP1              If error flag not zero then exit
+         TST.L   D0                 Else test for missing address
+         BEQ.S   JUMP1              field. If no address then exit
+         MOVE.L  D0,A0              Put jump address in A0 and call the
+         JMP     (A0)               subroutine. User to supply RTS!!
+JUMP1    LEA.L   ERMES1,A4          Here for error - display error
+         BRA     PRINTSTRING        message and return
+
 *        RESTORE moves the volatile environment from the display
 *        frame and transfers it to the 68000's registers. This
 *        re-runs a program suspended after an exception
@@ -1195,7 +1209,7 @@ msgEXTABinit	DC.B	'Initializing Exception Table...   ',0					*****
 msgDCBinit	DC.B	'Creating Device Control Blocks... ',0					*****
 msgColonSpc	DC.B	': ',0									*****
 												*****
-BANNER		DC.B	'RHOMBUS Monitor version 0.2016.01.03.0',0,0				*****
+BANNER		DC.B	'RHOMBUS Monitor version 0.2016.01.08.0',0,0				*****
 CRLF		DC.B	CR,LF,0									*****
 PROMPT		DC.B	CR,LF,'>',0								*****
 EXPROMPT	DC.B	CR,LF,'EX>',0								*****
@@ -1238,6 +1252,9 @@ COMTAB		DC.B	8,3		MEMORY <address> shows contents of			*****
 		DC.B	4,2		GO <address> starts program execution
 		DC.B	'GO  '		at <address> and loads regs from TSK_T
 		DC.L	GO-COMTAB
+                DC.B	4,4		JUMP <address> causes execution to
+		DC.B	'JUMP'		begin at <address>
+		DC.L	JUMP-COMTAB 
 		DC.B	0,0		TERMINATE COMMAND TABLE					*****
 ****************************************							*****
 *   Environment Parameter Equates								*****
