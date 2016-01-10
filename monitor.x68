@@ -875,6 +875,14 @@ REG_MD4  CMP.L   #68,D2              If this address is the SR then
          RTS
 REG_MD5  MOVE.W  D0,(A2)             Store SR (one word)
          RTS
+
+DELAY    EQU       *                Provide a time delay for the host
+         MOVEM.L   D0/A4,-(A7)      to settle. Save working registers
+         MOVE.L    #$4000,D0        Set up delay constant
+DELAY1   SUB.L     #1,D0            Count down         (8 clk cycles)
+         BNE       DELAY1           Repeat until zero  (10 clk cycles)
+         MOVEM.L   (A7)+,D0/A4      Restore working registers
+         RTS
 	
 *************************************************************************
 *
@@ -1011,6 +1019,88 @@ BR_CLR1  MOVE.L  (A0)+,D1            Get address of BP in D1
 BR_CLR2  LEA.L   2(A0),A0            Skip past op-code field
          DBRA    D0,BR_CLR1          Repeat until all tested
          RTS
+
+*************************************************************************
+*
+*  LOAD  Loads data formatted in hexadecimal "S" format from Port 2
+*        NOTE - I/O is automatically redirected to the aux port for
+*        loader functions. S1 or S2 records accepted
+*
+LOAD     MOVE.L   CONoVEC(A6),-(A7) Save current output device name
+         MOVE.L   CONiVEC(A6),-(A7) Save current input device name
+         MOVE.L   #DCB4,CONoVEC(A6) Set up aux ACIA as output
+         MOVE.L   #DCB3,CONiVEC(A6) Set up aux ACIA as input
+         ADD.B    #1,ECHO(A6)       Turn off character echo
+         BSR      NEWLINE           Send newline to host
+         BSR      DELAY             Wait for host to "settle"
+         BSR      DELAY
+         MOVE.L   BUFPT(A6),A4      Any string in the line buffer is
+LOAD1    MOVE.B   (A4)+,D0          transmitted to the host computer
+         BSR      PUTCHAR           before the loading begins
+         CMP.B    #CR,D0            Read from the buffer until EOL
+         BNE      LOAD1
+         BSR      NEWLINE           Send newline before loading
+LOAD2    BSR      GETCHAR           Records from the host must begin
+         CMP.B    #'S',D0           with S1/S2 (data) or S9/S8 (term)
+         BNE.S    LOAD2             Repeat GETCHAR until char = "S"
+         BSR      GETCHAR           Get character after "S"
+         CMP.B    #'9',D0           Test for the two terminators S9/S8
+         BEQ.S    LOAD3             If S9 record then exit else test
+         CMP.B    #'8',D0           for S8 terminator. Fall through to
+         BNE.S    LOAD6             exit on S8 else continue search
+LOAD3    EQU      *                 Exit point from LOAD
+         MOVE.L   (A7)+,CONiVEC(A6) Clean up by restoring input device
+         MOVE.L   (A7)+,CONoVEC(A6) and output device name
+         CLR.B    ECHO(A6)          Restore input character echo
+         BTST     #0,D7             Test for input errors
+         BEQ.S    LOAD4             If no I/P error then look at checksum
+         LEA.L    ERMES1,A4         Else point to error message
+         BSR      PRINTSTRING       Print it
+LOAD4    BTST     #3,D7             Test for checksum error
+         BEQ.S    LOAD5             If clear then exit
+         LEA.L    ERMES3,A4         Else point to error message
+         BSR      PRINTSTRING       Print it and return
+LOAD5    RTS
+LOAD6    CMP.B    #'1',D0           Test for S1 record
+         BEQ.S    LOAD6A            If S1 record then read it
+         CMP.B    #'2',D0           Else test for S2 record
+         BNE.S    LOAD2             Repeat until valid header found
+         CLR.B    D3                Read the S2 byte count and address,
+         BSR.S    LOAD8             clear the checksum
+         SUB.B    #4,D0             Calculate size of data field
+         MOVE.B   D0,D2             D2 contains data bytes to read
+         CLR.L    D0                Clear address accumulator
+         BSR.S    LOAD8             Read most sig byte of address
+         ASL.L    #8,D0             Move it one byte left
+         BSR.S    LOAD8             Read the middle byte of address
+         ASL.L    #8,D0             Move it one byte left
+         BSR.S    LOAD8             Read least sig byte of address
+         MOVE.L   D0,A2             A2 points to destination of record
+         BRA.S    LOAD7             Skip past S1 header loader
+LOAD6A   CLR.B    D3                S1 record found - clear checksum
+         BSR.S    LOAD8             Get byte and update checksum
+         SUB.B    #3,D0             Subtract 3 from record length
+         MOVE.B   D0,D2             Save byte count in D2
+         CLR.L    D0                Clear address accumulator
+         BSR.S    LOAD8             Get MS byte of load address
+         ASL.L    #8,D0             Move it to MS position
+         BSR.S    LOAD8             Get LS byte in D2
+         MOVE.L   D0,A2             A2 points to destination of data
+LOAD7    BSR.S    LOAD8             Get byte of data for loading
+         MOVE.B   D0,(A2)+          Store it
+         SUB.B    #1,D2             Decrement byte counter
+         BNE      LOAD7             Repeat until count = 0
+         BSR.S    LOAD8             Read checksum
+         ADD.B    #1,D3             Add 1 to total checksum
+         BEQ      LOAD2             If zero then start next record
+         OR.B     #%00001000,D7     Else set checksum error bit,
+         BRA      LOAD3             restore I/O devices and return
+*
+LOAD8    BSR     BYTE               Get a byte
+         ADD.B   D0,D3              Update checksum
+         RTS                         and return
+
+
 							  *
 ****************************************							*************************
 * MFP Transmit/Receive										*************************	
@@ -1255,6 +1345,9 @@ COMTAB		DC.B	8,3		MEMORY <address> shows contents of			*****
                 DC.B	4,4		JUMP <address> causes execution to
 		DC.B	'JUMP'		begin at <address>
 		DC.L	JUMP-COMTAB 
+		DC.B	4,2		LOAD <string> loads S1/S2 records
+		DC.B	'LOAD'		from the host. <string> is sent to host
+		DC.L	LOAD-COMTAB
 		DC.B	0,0		TERMINATE COMMAND TABLE					*****
 ****************************************							*****
 *   Environment Parameter Equates								*****
