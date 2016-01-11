@@ -21,6 +21,8 @@ RAM sizing and error checking is in place.  Monitor has the ability to analyze o
 Secondary monitor written to expand functionality.  Register viewing/modification possible, as is vectored
 selection of input/output devices.  Added NMI exception handler and trace/breakpoint functionality.
 
+Second monitor now contains all of the functionality of the original.  I am currently attempting to migrate the system to a VME style bus, however I am debating using a standard VME bus with a non-standard 4x32 pin header.  The issue revolves around the feasibility of such a design due to the need for boards with more than 2 layers.
+
 Next steps:
 
 --Addition of an MC68681 DUART which will work as auxillary serial port as well as keyboard input--
