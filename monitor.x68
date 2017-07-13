@@ -1342,6 +1342,9 @@ COMTAB		DC.B	8,3		MEMORY <address> shows contents of			*****
 		DC.B	4,2		GO <address> starts program execution
 		DC.B	'GO  '		at <address> and loads regs from TSK_T
 		DC.L	GO-COMTAB
+		DC.B	4,2									*****
+		DC.B	'GB  '		GB <address> sets breakpoints and then calls GO		*****
+		DC.L	GB-COMTAB								*****
                 DC.B	4,4		JUMP <address> causes execution to
 		DC.B	'JUMP'		begin at <address>
 		DC.L	JUMP-COMTAB 
