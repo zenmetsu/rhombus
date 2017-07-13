@@ -2,7 +2,7 @@
 *****************************************************************************************************
 *****	Title		: RHOMBUS System Monitor						*****
 *****	Written by	: Jason Westervelt							*****
-*****	Date		: 01 January 2016							*****
+*****	Date		: 12 July 2017								*****
 *****	Description	: A ROM monitor for the RHOMBUS minimalist 68020 system			*****
 *****			  which was designed around the Motorola Application Note 1015		*****
 *****												*****	
@@ -1299,7 +1299,7 @@ msgEXTABinit	DC.B	'Initializing Exception Table...   ',0					*****
 msgDCBinit	DC.B	'Creating Device Control Blocks... ',0					*****
 msgColonSpc	DC.B	': ',0									*****
 												*****
-BANNER		DC.B	'RHOMBUS Monitor version 0.2016.01.08.0',0,0				*****
+BANNER		DC.B	'RHOMBUS Monitor version 0.2017.07.12.0',0,0				*****
 CRLF		DC.B	CR,LF,0									*****
 PROMPT		DC.B	CR,LF,'>',0								*****
 EXPROMPT	DC.B	CR,LF,'EX>',0								*****
