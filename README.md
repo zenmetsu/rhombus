@@ -23,7 +23,23 @@ selection of input/output devices.  Added NMI exception handler and trace/breakp
 
 Second monitor now contains all of the functionality of the original.  I am currently attempting to migrate the system to a VME style bus, however I am debating using a standard VME bus with a non-standard 4x32 pin header.  The issue revolves around the feasibility of such a design due to the need for boards with more than 2 layers.
 
-Next steps:
+## Building
+
+monitor.x68 can be assembled with vasm using the following command :
+vasmm68k_mot -m68020 -Fbin ./monitor.x68 -o monitor.bin
+
+The resulting binary can be loaded onto a ROM for booting.
+
+## Additional programs
+
+mandelbrot.x68 can be assembled in the same manner as the monitor.  The resulting binary can be put into human readable format for pasting into the monitor with the following:
+xxd -u -s +15732736 -l 600 mandelbrot.bin | sed -e 's/  .*//' -e 's/^.*://' | sed -e :a -e '$!N; s/\n//; ta'
+
+Simply copy the code (including the leading space before the first long word) and, on the monitor, enter the command
+MEM F01000
+After hitting Enter, paste the code and it should be placed into RAM.  When paste is done, hit Enter to exit memory write mode and execute the program with JUMP F01000
+
+## Next steps:
 
 --S-Record load over serial--
 --Addition of an MC68681 DUART which will work as auxillary serial port as well as keyboard input--
