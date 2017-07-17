@@ -26,6 +26,7 @@ Second monitor now contains all of the functionality of the original.  I am curr
 ## Building
 
 monitor.x68 can be assembled with vasm using the following command :
+
 `vasmm68k_mot -m68020 -Fbin ./monitor.x68 -o monitor.bin`
 
 The resulting binary can be loaded onto a ROM for booting.
@@ -34,20 +35,22 @@ The resulting binary can be loaded onto a ROM for booting.
 ### mandelbrot - An ASCII Mandelbrot fractal explorer
 
 mandelbrot.x68 can be assembled in the same manner as the monitor.  The resulting binary can be put into human readable format for pasting into the monitor with the following:
+
 `xxd -u -s +15732736 -l 600 mandelbrot.bin | sed -e 's/  .*//' -e 's/^.*://' | sed -e :a -e '$!N; s/\n//; ta'`
 
 Simply copy the code (including the leading space before the first long word) and, on the monitor, enter the command
+
 `MEM F01000`
 After hitting Enter, paste the code and it should be placed into RAM.  When paste is done, hit Enter to exit memory write mode and execute the program with `JUMP F01000`
 
 Keys are as follows:
-'''
+```
 W,A,S,D   PAN up/left/down/right
 Q,E       ZOOM out/in
 Z,C       ITERATION decrease,increase
 R         RESETS to original conditions
 X         EXITS to ROM monitor
-'''
+```
 
 ## Next steps:
 
