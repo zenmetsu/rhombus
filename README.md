@@ -53,9 +53,9 @@ X         EXITS to ROM monitor
 
 ## Next steps:
 
---S-Record load over serial--
---Addition of an MC68681 DUART which will work as auxillary serial port as well as keyboard input--
-Addition of FT245 USB FIFO for auxillary serial connection
-Increasing RAM data bus to 32bits.  ROM to remain 8bit due to simplicity of flashing devices.
-Floppy drive interface
-PS/2 Keyboard via intel N8042 microcontroller
+- S-Record load over serial
+- Addition of an MC68681 DUART which will work as auxillary serial port as well as keyboard input
+- Addition of FT245 USB FIFO for auxillary serial connection
+- Increasing RAM data bus to 32bits.  ROM to remain 8bit due to simplicity of flashing devices.
+- Floppy drive interface
+- PS/2 Keyboard via intel N8042 microcontroller
