@@ -38,9 +38,8 @@ mandelbrot.x68 can be assembled in the same manner as the monitor.  The resultin
 
 `xxd -u -s +15732736 -l 600 mandelbrot.bin | sed -e 's/  .*//' -e 's/^.*://' | sed -e :a -e '$!N; s/\n//; ta'`
 
-Simply copy the code (including the leading space before the first long word) and, on the monitor, enter the command
+Simply copy the code (including the leading space before the first long word) and, on the monitor, enter the command `MEM F01000`
 
-`MEM F01000`
 After hitting Enter, paste the code and it should be placed into RAM.  When paste is done, hit Enter to exit memory write mode and execute the program with `JUMP F01000`
 
 Keys are as follows:
