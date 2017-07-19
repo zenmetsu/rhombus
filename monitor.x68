@@ -37,7 +37,7 @@
 *   Defines											*****
 												*****
 NOP		EQU	$4E71		STANDARD 68000 NOP INSTRUCTION				*****
-TRAP_14		EQU	$4E4E		Code for TRAP #14												*****
+TRAP_14		EQU	$4E4E		Code for TRAP #14					*****
 ****************************************							*****
 *   Addresses											*****
 												*****
@@ -83,10 +83,10 @@ CTRLC		EQU	$03									*****
 BEL		EQU	$07									*****
 BKSP		EQU	$08		CTRL-H							*****
 TAB		EQU	$09									*****
-LF		EQU	$0A								     ***********
-CR		EQU	$0D								      *********
-CTRLX		EQU	$18								       *******
-ESC		EQU	$1B									*****
+LF		EQU	$0A								     	*****
+CR		EQU	$0D								      	  *
+CTRLX		EQU	$18								       	 ***
+ESC		EQU	$1B									** **
 SPACE		EQU	$20									 ***
 CTRLA		EQU	$01									  *
 
@@ -98,18 +98,25 @@ CTRLA		EQU	$01									  *
 START		EQU	ROMBAS									*****
 		DC.L	STACK		INITIAL STACK POINTER					*****
 		DC.L	RESET		INITIAL PROGRAM COUNTER					*****
-ROMBUF		DS.L	32
+ROMBUF		DS.L	32									*****
 MEMDAT		EQU	*		MEMORY EXERCISER DATA					*****	
 		DC.B	$5									*****
 		DC.B	$A									*****
 		DC.B	$0									*****
-		DC.B	$F
+		DC.B	$F									*****
 		DS.L	$100									*****
 RESET		EQU	*		COLD ENTRY POINT					*****
 LORAMINIT	EQU	*		THIS WILL TEST AND PREP LOWEST 2K OF RAM 		*****
 *	This routine performs a quick check of memory prior to					*****
 *	proceeding.  The count of errors is stored in D7 at completion				*****
 *	We avoid using stack until the first 2K of RAM is deemed safe				*****
+					* A0 ram address being tested				*****
+					* A1 pointer to RAM test pattern			*****
+					* D0 loop counter					*****
+					* D2 byte read/written					*****
+					* D3 test pattern index					*****
+					* D7 error count					*****
+					*							*****
 		CLR.L	D7		CLEAR ERROR COUNTER					*****
 		MOVE.L	#3,D3		INIT OUTER LOOP COUNTER					*****
 		LEA.L	RAMBAS,A0	POINT TO BASE OF RAM					*****
@@ -123,9 +130,9 @@ LORAMINIT	EQU	*		THIS WILL TEST AND PREP LOWEST 2K OF RAM 		*****
 		MOVE.B	D2,(A0,D0)	PUT DATA INTO MEMORY					*****
 		CMP.B	(A0,D0),D2	COMPARE WITH STORED DATA				*****
 		BEQ.S	.loop1_1	JUMP IF MATCHES						*****
-		ADDQ	#1,D7		ELSE INCREMEMBT ERROR COUNT				*****
+		ADDQ	#1,D7		ELSE INCREMENT ERROR COUNT				*****
 												*****
-.loop1_1		EQU	*								*****
+.loop1_1	EQU	*									*****
 		DBRA	D0,.loop1	TEST ALL OF RAM						*****
 		DBRA	D3,.loop0	FOR ALL DATA TYPES (4 TESTS)				*****
 												*****
@@ -151,14 +158,14 @@ memInit		EQU	*									*****
 		MOVE.L	D1,(A0,D0)	PUT HANDLER ADDRESS THERE				*****
 		SUBQ	#4,D0		AND DECREMENT POINTER					*****
 		BGE.S	.loop3		FILL REST OF MEMORY					*****
-* END RAM INITIALIZATION		
+* END RAM INITIALIZATION									*****
 		LEA	RAMBAS,A6	POINT A6 TO DATA AREA					*****
 		CLR.L	UCOMTAB(A6)	RESET USER COMMAND TABLE POINTER			*****
 		BSR.S	CFGUART		CONFIGURE UART						*****
-		LEA.L	msgPOR,A0	SEND POWER-ON-RESET MESSAGE
-		BSR.W	printString
-		LEA.L	msgLORAMck,A0	SEND LOW RAM CHECK MESSAGE
-		BSR.W	printString
+		LEA.L	msgPOR,A0	SEND POWER-ON-RESET MESSAGE				*****
+		BSR.W	printString								*****
+		LEA.L	msgLORAMck,A0	SEND LOW RAM CHECK MESSAGE				*****
+		BSR.W	printString								*****
 		LEA.L	msgOK,A0								*****
 		BSR.W	printString								*****
 		LEA.L	msgEXTABinit,A0								*****
@@ -187,12 +194,12 @@ WARM		CLR.L	D7		CLEAR ERROR FLAG					*****
 *****************************************************************************************************
 * INITIALIZATION SECTION                                                                        *****
                                                                                                 *****
-CFGUART		EQU	*
-		BSR.W	MFPINIT
-		RTS
-
-
-EXCSET		EQU	*		SET UP EXCEPTION TABLE
+CFGUART		EQU	*									*****
+		BSR.W	MFPINIT									*****
+		RTS										*****
+												*****
+												*****
+EXCSET		EQU	*		SET UP EXCEPTION TABLE					*****
 		MOVE.L	#RAMBAS,D0	POINT TO BASE OF RAM					*****
 		MOVEC.L	D0,VBR		INITIALIZE VBR						*****
 		LEA	RAMBAS,A0	POINT TO VECTOR BASE					*****
@@ -203,16 +210,20 @@ EXCSET		EQU	*		SET UP EXCEPTION TABLE
 		MOVE.L	#TRAP0,128(A0)	SET UP TRAP #0 EXCEPTION				*****
 		MOVE.L	#BRKPT,184(A0)	SET UP TRAP #14 = BREAKPOINT VECTOR			*****
 		MOVE.L	#WARM,188(A0)	SET UP TRAP #15 EXCEPTION VECTOR			*****
-												 ***
 		MOVE.W	#7,D0		CLEAR THE BREAKPOINT TABLE				*****
 		LEA	BKPTAB(A6),A0	POINT TO TABLE						*****
 EXCSET_2	CLR.L	(A0)+		CLEAR AN ADDRESS ENTRY					*****
-		CLR.W	(A0)+		CLEAR A DATA ENTRY					*****
-		DBRA	D0,EXCSET_2	REPEAT FOR REMAINING TABLE ENTRIES			*****
-		RTS										*****
+		CLR.W	(A0)+		CLEAR A DATA ENTRY					  *
+		DBRA	D0,EXCSET_2	REPEAT FOR REMAINING TABLE ENTRIES			 *** 
+		RTS										** **
 												 ***
-TRAP0		EQU	*									*****
-		CMP.B	#0,D1		D1 =  0 = Get character					*****
+												  *
+												 
+*****************************************************************************************************
+*****************************************************************************************************
+* TRAPS			                                                                        *****
+												*****
+TRAP0		CMP.B	#0,D1		D1 =  0 = Get character					*****
 		BNE.S	TRAP1									*****
 		BSR	GETCHAR									*****
 		RTE										*****
@@ -227,19 +238,22 @@ TRAP2		CMP.B	#2,D1		D2 =  2 = Newline					*****
 		BSR	NEWLINE									*****
 		RTE										*****
 												 ***
-TRAP3   CMP.B   #3,D1             D1 = 3 = Get parameter from buffer
-        BNE.S   TRAP4
-        BSR     PARAM
-        RTE
-TRAP4   CMP.B   #4,D1             D1 = 4 = Print string pointed at by A4
-        BNE.S   TRAP5
-        BSR     PRINTSTRING
-        RTE
-TRAP5   CMP.B   #5,D1             D1 = 5 = Get a hex character
-        BNE.S   TRAP6
-        BSR     HEX
-        RTE
-TRAP6   CMP.B   #6,D1             D1 = 6 = Get a hex byte
+TRAP3		CMP.B	#3,D1		D1 = 3 = Get parameter from buffer			*****
+		BNE.S	TRAP4									*****
+		BSR	PARAM									*****
+		RTE										*****
+												 ***
+TRAP4		CMP.B	#4,D1		D1 = 4 = Print string pointed at by A4			*****
+		BNE.S	TRAP5									*****
+		BSR	PRINTSTRING								*****
+		RTE										*****
+												 ***
+TRAP5		CMP.B   #5,D1             D1 = 5 = Get a hex character				*****
+		BNE.S   TRAP6									*****
+		BSR     HEX									*****
+		RTE										*****
+												 ***
+TRAP6   CMP.B   #6,D1             D1 = 6 = Get a hex byte	
         BNE.S   TRAP7
         BSR     BYTE
         RTE
