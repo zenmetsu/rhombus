@@ -59,3 +59,5 @@ X         EXITS to ROM monitor
 - Increasing RAM data bus to 32bits.  ROM to remain 8bit due to simplicity of flashing devices.
 - Floppy drive interface
 - PS/2 Keyboard via intel N8042 microcontroller
+
+Currently rebuilding CPLD files due to loss of CPLD project files
