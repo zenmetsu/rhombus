@@ -1,6 +1,8 @@
 # rhombus
 A minimal m68k system utilizing the 68020 microprocessor 
 
+Project page located here: https://hackaday.io/project/8725-rhombus
+
 Building upon the Motorola Application Note 1015 which can be found at the following address:
 http://archive.retro.co.za/archive/computers/AppNotes/Motorola-AN1015.pdf
 
